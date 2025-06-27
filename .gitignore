@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env
+
+# Logs and output
+*.log
+*.out
+*.db
+*.sqlite3
+
+# IDEs and editors
+.vscode/
+.idea/
+.DS_Store
+
+# Build and distribution
+dist/
+build/
+
+# FAISS and vector store files
+*.FAISS*
+*.pt
+
+# Jupyter artifacts
+.ipynb_checkpoints/
+
