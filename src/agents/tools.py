@@ -2,7 +2,11 @@ from typing import Dict, List, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
+try:
+    from langchain_anthropic import ChatAnthropic
+except ImportError:
+    # Fallback for different versions
+    ChatAnthropic = None
 
 from src.db.crud.content import create_content, get_contents
 from src.api.schemas.content import LearningContentCreate
@@ -19,10 +23,12 @@ def get_llm(provider: str, model: str, temperature: float = 0.7):
             api_key=settings.OPENAI_API_KEY.get_secret_value()
         )
     elif provider.lower() == "anthropic":
+        if ChatAnthropic is None:
+            raise ValueError("Anthropic not available. Install langchain-anthropic")
         return ChatAnthropic(
             model=model,
             temperature=temperature,
-            api_key=settings.ANTHROPIC_API_KEY.get_secret_value()
+            anthropic_api_key=settings.ANTHROPIC_API_KEY.get_secret_value()
         )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
@@ -94,7 +100,6 @@ async def extract_metadata_from_content(
         "estimated_cost": 5.0
     }
 
-@tool
 async def search_similar_content(
     metadata: Dict[str, Any],
     db_session: AsyncSession,
@@ -121,7 +126,6 @@ async def search_similar_content(
         for item in similar_items
     ]
 
-@tool
 async def create_learning_content(
     metadata: Dict[str, Any],
     raw_content: str,

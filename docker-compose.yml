@@ -1,76 +1,86 @@
-version: '3.8'
+# version: '3.8'
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - ./:/app
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    depends_on:
-      - postgres
-      - chromadb
-      - redis
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
-    networks:
-      - curriculum_network
-
+  # PostgreSQL Database
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: curriculum_builder
+      POSTGRES_USER: curriculum_user
+      POSTGRES_PASSWORD: curriculum_pass
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-curriculum_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - curriculum_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U curriculum_user -d curriculum_builder"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  chromadb:
-    image: ghcr.io/chroma-core/chroma:latest
-    ports:
-      - "8001:8000"
-    volumes:
-      - chroma_data:/chroma/chroma
-    environment:
-      - ALLOW_RESET=true
-      - ANONYMIZED_TELEMETRY=false
-    networks:
-      - curriculum_network
-
+  # Redis for caching and session management
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
-    networks:
-      - curriculum_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+  # ChromaDB Vector Store
+  chromadb:
+    image: chromadb/chroma:latest
     ports:
-      - "5050:80"
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+    healthcheck:
+      test: [ "CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/8000" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FastAPI Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      - APP_ENV=development
+      - DEBUG=true
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=curriculum_builder
+      - POSTGRES_USER=curriculum_user
+      - POSTGRES_PASSWORD=curriculum_pass
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - SECRET_KEY=dev-secret-key-change-in-production
     depends_on:
-      - postgres
-    networks:
-      - curriculum_network
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   postgres_data:
-  chroma_data:
   redis_data:
-
-networks:
-  curriculum_network:
-    driver: bridge
+  chroma_data:

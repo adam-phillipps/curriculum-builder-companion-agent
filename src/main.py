@@ -6,7 +6,7 @@ from src.api.routes import content, agents
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await initialize_database()
+    # await initialize_database()  # Temporarily disabled
     yield
     # Shutdown (if needed)
 

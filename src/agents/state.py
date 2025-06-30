@@ -13,6 +13,8 @@ class WorkflowStatus(str, Enum):
     ERROR = "error"
 
 class WorkflowState(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    
     # Input data
     raw_content: str
     user_id: Optional[str] = None

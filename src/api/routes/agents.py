@@ -10,6 +10,8 @@ from src.agents.state import WorkflowState, WorkflowStatus
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
 class ContentSubmissionRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    
     content: str
     user_id: Optional[str] = None
     model_provider: str = "openai"
