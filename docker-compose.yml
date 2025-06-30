@@ -80,6 +80,22 @@ services:
       - .:/app
     command: sh -c "python scripts/migrate.py && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
 
+  # Next.js Frontend
+  frontend:
+    image: node:18-alpine
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+    depends_on:
+      - app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev"
+
 volumes:
   postgres_data:
   redis_data:
