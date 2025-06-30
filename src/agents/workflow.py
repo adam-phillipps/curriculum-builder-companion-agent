@@ -86,7 +86,8 @@ class ContentProcessingWorkflow:
             search_tool = self.content_tools[0]  # search_similar_content
             similar_content = await search_tool.ainvoke({
                 "metadata": state["extracted_metadata"],
-                "threshold": settings.SIMILARITY_THRESHOLD
+                "threshold": settings.SIMILARITY_THRESHOLD,
+                "query_text": state.get("raw_content", "")
             })
             
             # Calculate max similarity score
