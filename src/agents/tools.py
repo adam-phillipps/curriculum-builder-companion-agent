@@ -180,17 +180,17 @@ async def _create_learning_content(
     
     content_data = LearningContentCreate(
         code_title=code_title,
-        title=metadata["title"],
-        description=metadata["description"],
-        content_type=metadata["content_type"],
-        tier=metadata["tier"],
-        personas=metadata["personas"],
-        learning_objectives=metadata["learning_objectives"],
-        estimated_duration=metadata["estimated_duration"],
-        sandbox_type=metadata["sandbox_type"],
+        title=metadata.get("title", "Learning Content"),
+        description=metadata.get("description", "Generated learning content"),
+        content_type=metadata.get("content_type", "lesson"),
+        tier=metadata.get("tier", "T2"),
+        personas=metadata.get("personas", ["developer"]),
+        learning_objectives=metadata.get("learning_objectives", ["Learn concepts"]),
+        estimated_duration=metadata.get("estimated_duration", 30),
+        sandbox_type=metadata.get("sandbox_type", "individual"),
         aws_services=metadata.get("aws_services", []),
         technical_requirements=metadata.get("technical_requirements", {}),
-        estimated_cost=metadata["estimated_cost"],
+        estimated_cost=metadata.get("estimated_cost", 5.0),
         status="draft"
     )
     

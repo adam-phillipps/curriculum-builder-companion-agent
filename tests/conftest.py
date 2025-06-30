@@ -37,17 +37,27 @@ async def test_engine():
     await engine.dispose()
 
 @pytest.fixture
-async def test_session(test_engine):
-    """Create test database session."""
-    async_session = async_sessionmaker(test_engine, expire_on_commit=False)
-    async with async_session() as session:
-        yield session
-        await session.rollback()
+def test_session_factory(test_engine):
+    """Create test database session factory."""
+    return async_sessionmaker(test_engine, expire_on_commit=False)
 
 @pytest.fixture
-async def session(test_session):
-    """Alias for test_session to match existing test expectations."""
-    yield test_session
+async def test_session(test_session_factory):
+    """Create test database session."""
+    async with test_session_factory() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
+
+@pytest.fixture
+async def session(test_session_factory):
+    """Create database session for tests that expect 'session' fixture."""
+    async with test_session_factory() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
 
 @pytest.fixture
 async def client():
