@@ -53,7 +53,7 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
         if not self.DATABASE_URL:
             self.DATABASE_URL = PostgresDsn.build(
-                scheme="postgresql",
+                scheme="postgresql+asyncpg",
                 username=self.POSTGRES_USER,
                 password=self.POSTGRES_PASSWORD,
                 host=self.POSTGRES_HOST,

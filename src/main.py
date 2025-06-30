@@ -1,12 +1,12 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from src.db.init import initialize_database
-from src.api.routes import content
+from src.api.routes import content, agents
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await initialize_database()
+    # await initialize_database()  # Temporarily disabled
     yield
     # Shutdown (if needed)
 
@@ -18,3 +18,4 @@ app = FastAPI(
 )
 
 app.include_router(content.router)
+app.include_router(agents.router)
