@@ -23,7 +23,7 @@ class ContentSubmissionRequest(BaseModel):
 
 class ContentSubmissionResponse(BaseModel):
     workflow_id: str
-    status: WorkflowStatus
+    status: str  # Changed from WorkflowStatus to str for JSON serialization
     content_id: Optional[int] = None
     extracted_metadata: dict = {}
     similar_content: List[dict] = []
@@ -61,7 +61,7 @@ async def process_content(
         
         return ContentSubmissionResponse(
             workflow_id=workflow_id,
-            status=final_state.status,
+            status=final_state.status.value,  # Convert enum to string
             content_id=final_state.content_id,
             extracted_metadata=final_state.extracted_metadata,
             similar_content=final_state.similar_content,

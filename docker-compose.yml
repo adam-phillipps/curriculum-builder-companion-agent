@@ -5,15 +5,15 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: curriculum_builder
-      POSTGRES_USER: curriculum_user
-      POSTGRES_PASSWORD: curriculum_pass
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U curriculum_user -d curriculum_builder"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -55,20 +55,20 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - APP_ENV=development
-      - DEBUG=true
+      - APP_ENV=${APP_ENV:-development}
+      - DEBUG=${DEBUG:-true}
       - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=curriculum_builder
-      - POSTGRES_USER=curriculum_user
-      - POSTGRES_PASSWORD=curriculum_pass
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - REDIS_PORT=${REDIS_PORT:-6379}
       - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
+      - CHROMA_PORT=${CHROMA_PORT:-8000}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - SECRET_KEY=dev-secret-key-change-in-production
+      - SECRET_KEY=${SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,7 +78,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "python scripts/migrate.py && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
 
 volumes:
   postgres_data:

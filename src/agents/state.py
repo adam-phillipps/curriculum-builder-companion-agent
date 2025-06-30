@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional, Any
+from typing_extensions import TypedDict, Annotated
 from pydantic import BaseModel
 from enum import Enum
 
@@ -12,6 +13,40 @@ class WorkflowStatus(str, Enum):
     PUBLISHED = "published"
     ERROR = "error"
 
+# LangGraph State (TypedDict with Annotated fields)
+class AgentState(TypedDict):
+    # Input data
+    raw_content: Annotated[str, "Raw content to process"]
+    user_id: Annotated[Optional[str], "User who submitted content"]
+    model_provider: Annotated[str, "LLM provider (openai, anthropic)"]
+    model_name: Annotated[str, "Specific model name"]
+    
+    # User suggestions
+    suggested_tier: Annotated[Optional[str], "User suggested difficulty tier"]
+    suggested_tags: Annotated[List[str], "User suggested tags"]
+    suggested_personas: Annotated[List[str], "User suggested target personas"]
+    suggested_content_type: Annotated[Optional[str], "User suggested content type"]
+    
+    # Extracted metadata
+    extracted_metadata: Annotated[Dict[str, Any], "AI extracted metadata"]
+    
+    # Similarity analysis
+    similar_content: Annotated[List[Dict[str, Any]], "Similar existing content"]
+    similarity_score: Annotated[Optional[float], "Highest similarity score"]
+    
+    # Review process
+    status: Annotated[str, "Current workflow status"]
+    human_review_required: Annotated[bool, "Whether human review is needed"]
+    review_feedback: Annotated[Optional[str], "Human reviewer feedback"]
+    
+    # Final content
+    content_id: Annotated[Optional[int], "Created content database ID"]
+    
+    # Error handling
+    error_message: Annotated[Optional[str], "Error details if any"]
+    retry_count: Annotated[int, "Number of retry attempts"]
+
+# Keep Pydantic model for API validation
 class WorkflowState(BaseModel):
     model_config = {"protected_namespaces": ()}
     
@@ -45,3 +80,48 @@ class WorkflowState(BaseModel):
     # Error handling
     error_message: Optional[str] = None
     retry_count: int = 0
+    
+    def to_agent_state(self) -> AgentState:
+        """Convert Pydantic model to LangGraph AgentState."""
+        return AgentState(
+            raw_content=self.raw_content,
+            user_id=self.user_id,
+            model_provider=self.model_provider,
+            model_name=self.model_name,
+            suggested_tier=self.suggested_tier,
+            suggested_tags=self.suggested_tags,
+            suggested_personas=self.suggested_personas,
+            suggested_content_type=self.suggested_content_type,
+            extracted_metadata=self.extracted_metadata,
+            similar_content=self.similar_content,
+            similarity_score=self.similarity_score,
+            status=self.status.value,
+            human_review_required=self.human_review_required,
+            review_feedback=self.review_feedback,
+            content_id=self.content_id,
+            error_message=self.error_message,
+            retry_count=self.retry_count
+        )
+    
+    @classmethod
+    def from_agent_state(cls, agent_state: AgentState) -> "WorkflowState":
+        """Convert LangGraph AgentState back to Pydantic model."""
+        return cls(
+            raw_content=agent_state["raw_content"],
+            user_id=agent_state.get("user_id"),
+            model_provider=agent_state.get("model_provider", "openai"),
+            model_name=agent_state.get("model_name", "gpt-4"),
+            suggested_tier=agent_state.get("suggested_tier"),
+            suggested_tags=agent_state.get("suggested_tags", []),
+            suggested_personas=agent_state.get("suggested_personas", []),
+            suggested_content_type=agent_state.get("suggested_content_type"),
+            extracted_metadata=agent_state.get("extracted_metadata", {}),
+            similar_content=agent_state.get("similar_content", []),
+            similarity_score=agent_state.get("similarity_score"),
+            status=WorkflowStatus(agent_state.get("status", WorkflowStatus.PENDING.value)),
+            human_review_required=agent_state.get("human_review_required", False),
+            review_feedback=agent_state.get("review_feedback"),
+            content_id=agent_state.get("content_id"),
+            error_message=agent_state.get("error_message"),
+            retry_count=agent_state.get("retry_count", 0)
+        )

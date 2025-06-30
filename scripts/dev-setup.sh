@@ -32,9 +32,8 @@ sleep 10
 echo "🔍 Checking service health..."
 docker compose ps
 
-# Run database migrations
-echo "🗄️  Running database migrations..."
-docker compose exec app alembic upgrade head
+# Database migrations now run automatically on startup
+echo "🗄️  Database migrations will run automatically on startup"
 
 echo "✅ Development environment is ready!"
 echo ""

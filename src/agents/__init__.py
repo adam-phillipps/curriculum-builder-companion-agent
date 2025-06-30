@@ -1,4 +1,4 @@
 from .workflow import ContentProcessingWorkflow
-from .state import WorkflowState
+from .state import WorkflowState, AgentState
 
-__all__ = ["ContentProcessingWorkflow", "WorkflowState"]
+__all__ = ["ContentProcessingWorkflow", "WorkflowState", "AgentState"]

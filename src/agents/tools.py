@@ -100,12 +100,12 @@ async def extract_metadata_from_content(
         "estimated_cost": 5.0
     }
 
-async def search_similar_content(
+async def _search_similar_content(
     metadata: Dict[str, Any],
     db_session: AsyncSession,
     threshold: float = 0.85
 ) -> List[Dict[str, Any]]:
-    """Search for similar content in database."""
+    """Internal function to search for similar content in database."""
     
     # Simple metadata-based similarity for now
     filters = {
@@ -126,13 +126,13 @@ async def search_similar_content(
         for item in similar_items
     ]
 
-async def create_learning_content(
+async def _create_learning_content(
     metadata: Dict[str, Any],
     raw_content: str,
     db_session: AsyncSession,
     user_id: Optional[str] = None
 ) -> int:
-    """Create learning content in database."""
+    """Internal function to create learning content in database."""
     
     # Generate unique code_title
     import random
@@ -156,3 +156,25 @@ async def create_learning_content(
     
     db_content = await create_content(db_session, content_data)
     return db_content.id
+
+def create_content_tools(db_session: AsyncSession):
+    """Create tools with database session bound - Tool Factory Pattern."""
+    
+    @tool
+    async def search_similar_content(
+        metadata: Dict[str, Any],
+        threshold: float = 0.85
+    ) -> List[Dict[str, Any]]:
+        """Search for similar content in database."""
+        return await _search_similar_content(metadata, db_session, threshold)
+    
+    @tool
+    async def create_learning_content(
+        metadata: Dict[str, Any],
+        raw_content: str,
+        user_id: Optional[str] = None
+    ) -> int:
+        """Create learning content in database."""
+        return await _create_learning_content(metadata, raw_content, db_session, user_id)
+    
+    return [search_similar_content, create_learning_content]
