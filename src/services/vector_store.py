@@ -129,15 +129,13 @@ class VectorStoreService:
         # Choose collection to search
         collection = self.approved_collection if search_approved_only else self.draft_collection
         
-        # Build ChromaDB where clause from filters
+        # Build ChromaDB where clause from filters (simplified for compatibility)
         where_clause = {}
         if metadata_filters:
             for key, value in metadata_filters.items():
                 if key in ["tier", "content_type", "sandbox_type"] and value:
                     where_clause[key] = value
-                elif key == "estimated_duration" and value:
-                    # Range query for duration (±30 minutes)
-                    where_clause["estimated_duration"] = {"$gte": value - 30, "$lte": value + 30}
+                # Skip complex range queries that cause ChromaDB issues
         
         try:
             # Query ChromaDB

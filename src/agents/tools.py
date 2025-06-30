@@ -175,7 +175,8 @@ async def _create_learning_content(
     
     # Generate unique code_title
     import random
-    code_title = f"{metadata['tier']}.{metadata['personas'][0][:3].upper()}.{random.randint(100, 999):03d}"
+    personas = metadata.get('personas', ['DEV'])  # Default fallback
+    code_title = f"{metadata['tier']}.{personas[0][:3].upper()}.{random.randint(100, 999):03d}"
     
     content_data = LearningContentCreate(
         code_title=code_title,

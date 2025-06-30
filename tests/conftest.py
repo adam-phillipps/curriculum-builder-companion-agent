@@ -45,6 +45,11 @@ async def test_session(test_engine):
         await session.rollback()
 
 @pytest.fixture
+async def session(test_session):
+    """Alias for test_session to match existing test expectations."""
+    yield test_session
+
+@pytest.fixture
 async def client():
     """Create test HTTP client."""
     async with AsyncClient(app=app, base_url="http://test") as ac:
