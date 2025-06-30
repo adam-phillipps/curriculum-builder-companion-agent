@@ -13,11 +13,15 @@ interface Props {
 export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionComplete, disabled }: Props) {
   const [formData, setFormData] = useState<ContentSubmissionRequest>({
     content: '',
+    title: '',
     model_provider: 'openai',
     model_name: 'gpt-4',
     suggested_tier: 'T2',
     suggested_personas: ['developer'],
     suggested_content_type: 'lesson',
+    suggested_tags: [],
+    suggested_duration: 60,
+    suggested_sandbox_type: 'individual',
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +52,22 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
+          <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+            Content Title
+          </label>
+          <input
+            id="title"
+            type="text"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            placeholder="e.g., 'Getting Started with AWS Lambda'"
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            disabled={disabled}
+          />
+          <p className="text-xs text-gray-500 mt-1">Optional - AI will generate a title if not provided</p>
+        </div>
+
+        <div>
           <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
             Learning Content *
           </label>
@@ -73,10 +93,10 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label htmlFor="tier" className="block text-sm font-medium text-gray-700 mb-2">
-              Suggested Tier
+              Difficulty Tier
             </label>
             <select
               id="tier"
@@ -107,33 +127,91 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
               <option value="module">Module</option>
               <option value="exercise">Exercise</option>
               <option value="assessment">Assessment</option>
+              <option value="session">Session</option>
+              <option value="experiment">Experiment</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-2">
+              Duration (minutes)
+            </label>
+            <input
+              id="duration"
+              type="number"
+              min="5"
+              max="480"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              value={formData.suggested_duration}
+              onChange={(e) => setFormData({ ...formData, suggested_duration: parseInt(e.target.value) || 60 })}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="personas" className="block text-sm font-medium text-gray-700 mb-2">
+              Target Learner Roles
+            </label>
+            <select
+              id="personas"
+              multiple
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              value={formData.suggested_personas}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                suggested_personas: Array.from(e.target.selectedOptions, option => option.value)
+              })}
+              disabled={disabled}
+            >
+              <option value="developer">Developer</option>
+              <option value="architect">Solution Architect</option>
+              <option value="operations">Operations Engineer</option>
+              <option value="security">Security Engineer</option>
+              <option value="data_engineer">Data Engineer</option>
+              <option value="ml_engineer">ML Engineer</option>
+              <option value="all_roles">All Roles</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+          </div>
+
+          <div>
+            <label htmlFor="sandbox_type" className="block text-sm font-medium text-gray-700 mb-2">
+              Sandbox Environment
+            </label>
+            <select
+              id="sandbox_type"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              value={formData.suggested_sandbox_type}
+              onChange={(e) => setFormData({ ...formData, suggested_sandbox_type: e.target.value })}
+              disabled={disabled}
+            >
+              <option value="individual">Individual - Single learner</option>
+              <option value="shared">Shared - Multi-learner</option>
+              <option value="isolated">Isolated - Completely separate</option>
+              <option value="managed">Managed - Instructor controlled</option>
             </select>
           </div>
         </div>
 
         <div>
-          <label htmlFor="personas" className="block text-sm font-medium text-gray-700 mb-2">
-            Target Personas
+          <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
+            Topic Tags
           </label>
-          <select
-            id="personas"
-            multiple
+          <input
+            id="tags"
+            type="text"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            value={formData.suggested_personas}
+            placeholder="e.g., serverless, python, api-gateway, cloudformation"
+            value={formData.suggested_tags?.join(', ') || ''}
             onChange={(e) => setFormData({ 
               ...formData, 
-              suggested_personas: Array.from(e.target.selectedOptions, option => option.value)
+              suggested_tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)
             })}
             disabled={disabled}
-          >
-            <option value="developer">Developer</option>
-            <option value="architect">Architect</option>
-            <option value="operations">Operations</option>
-            <option value="security">Security</option>
-            <option value="data_engineer">Data Engineer</option>
-            <option value="ml_engineer">ML Engineer</option>
-          </select>
-          <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+          />
+          <p className="text-xs text-gray-500 mt-1">Separate multiple tags with commas</p>
         </div>
 
         {error && (

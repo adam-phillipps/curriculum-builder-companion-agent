@@ -35,10 +35,14 @@ def get_llm(provider: str, model: str, temperature: float = 0.7):
 
 @tool
 async def extract_metadata_from_content(
-    content: str, 
+    content: str,
+    title: Optional[str] = None,
     suggested_tier: Optional[str] = None,
     suggested_personas: List[str] = [],
     suggested_content_type: Optional[str] = None,
+    suggested_tags: List[str] = [],
+    suggested_duration: Optional[int] = None,
+    suggested_sandbox_type: Optional[str] = None,
     model_provider: str = "openai",
     model_name: str = "gpt-4"
 ) -> Dict[str, Any]:
@@ -59,9 +63,13 @@ async def extract_metadata_from_content(
     {content}
     
     USER SUGGESTIONS:
+    - Title: {title or 'Not specified'}
     - Tier: {suggested_tier or 'Not specified'}
     - Personas: {suggested_personas or 'Not specified'}
     - Content Type: {suggested_content_type or 'Not specified'}
+    - Tags: {suggested_tags or 'Not specified'}
+    - Duration: {suggested_duration or 'Not specified'} minutes
+    - Sandbox: {suggested_sandbox_type or 'Not specified'}
     
     AVAILABLE OPTIONS:
     - Tiers: {tiers} (T1=Foundational, T2=Intermediate, T3=Advanced, T4=Expert)
@@ -91,7 +99,7 @@ async def extract_metadata_from_content(
     print(f"DEBUG: Skipping LLM call, using fallback metadata")
     
     # Return fallback metadata based on content analysis
-    return _extract_from_text(content, suggested_tier, suggested_personas, suggested_content_type)
+    return _extract_from_text(content, title, suggested_tier, suggested_personas, suggested_content_type, suggested_tags, suggested_duration, suggested_sandbox_type)
     
     # TODO: Re-enable LLM extraction once we have proper API keys and error handling
     # try:
@@ -216,7 +224,16 @@ async def _create_learning_content(
     
     return db_content.id
 
-def _extract_from_text(text: str, suggested_tier: str, suggested_personas: List[str], suggested_content_type: str) -> Dict[str, Any]:
+def _extract_from_text(
+    text: str, 
+    title: Optional[str], 
+    suggested_tier: Optional[str], 
+    suggested_personas: List[str], 
+    suggested_content_type: Optional[str],
+    suggested_tags: List[str],
+    suggested_duration: Optional[int],
+    suggested_sandbox_type: Optional[str]
+) -> Dict[str, Any]:
     """Extract metadata from plain text response as fallback."""
     # Simple text analysis fallback
     aws_services = []
@@ -227,22 +244,34 @@ def _extract_from_text(text: str, suggested_tier: str, suggested_personas: List[
     if "ec2" in text.lower():
         aws_services.append("EC2")
     
-    # Estimate duration based on content length
-    word_count = len(text.split())
-    estimated_duration = max(30, min(180, word_count // 5))  # 30-180 minutes, ~5 words per minute reading
+    # Estimate duration based on content length or user suggestion
+    if suggested_duration:
+        estimated_duration = suggested_duration
+    else:
+        word_count = len(text.split())
+        estimated_duration = max(30, min(180, word_count // 5))  # 30-180 minutes, ~5 words per minute reading
+    
+    # Generate title if not provided
+    generated_title = title or "Learning Content"
+    if not title and len(text) > 50:
+        # Try to extract a title from the first line or sentence
+        first_line = text.split('\n')[0].strip()
+        if len(first_line) < 100 and any(word in first_line.lower() for word in ['tutorial', 'guide', 'introduction', 'getting started']):
+            generated_title = first_line
     
     return {
-        "title": "Learning Content",
+        "title": generated_title,
         "description": text[:200] + "..." if len(text) > 200 else text,
         "tier": suggested_tier or "T2",
         "personas": suggested_personas or ["developer"],
         "content_type": suggested_content_type or "lesson",
         "learning_objectives": ["Understand core concepts", "Apply practical skills"],
         "estimated_duration": estimated_duration,
-        "sandbox_type": "individual",
+        "sandbox_type": suggested_sandbox_type or "individual",
         "aws_services": aws_services,
         "technical_requirements": {"runtime": "python3.9"},
-        "estimated_cost": 5.0
+        "estimated_cost": 5.0,
+        "tags": suggested_tags or []
     }
 
 def create_content_tools(db_session: AsyncSession):

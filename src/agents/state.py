@@ -22,10 +22,13 @@ class AgentState(TypedDict):
     model_name: Annotated[str, "Specific model name"]
     
     # User suggestions
+    title: Annotated[Optional[str], "User provided title"]
     suggested_tier: Annotated[Optional[str], "User suggested difficulty tier"]
     suggested_tags: Annotated[List[str], "User suggested tags"]
     suggested_personas: Annotated[List[str], "User suggested target personas"]
     suggested_content_type: Annotated[Optional[str], "User suggested content type"]
+    suggested_duration: Annotated[Optional[int], "User suggested duration in minutes"]
+    suggested_sandbox_type: Annotated[Optional[str], "User suggested sandbox environment"]
     
     # Extracted metadata
     extracted_metadata: Annotated[Dict[str, Any], "AI extracted metadata"]
@@ -57,10 +60,13 @@ class WorkflowState(BaseModel):
     model_name: str = "gpt-4"
     
     # User suggestions
+    title: Optional[str] = None
     suggested_tier: Optional[str] = None
     suggested_tags: List[str] = []
     suggested_personas: List[str] = []
     suggested_content_type: Optional[str] = None
+    suggested_duration: Optional[int] = None
+    suggested_sandbox_type: Optional[str] = None
     
     # Extracted metadata
     extracted_metadata: Dict[str, Any] = {}
@@ -88,10 +94,13 @@ class WorkflowState(BaseModel):
             user_id=self.user_id,
             model_provider=self.model_provider,
             model_name=self.model_name,
+            title=self.title,
             suggested_tier=self.suggested_tier,
             suggested_tags=self.suggested_tags,
             suggested_personas=self.suggested_personas,
             suggested_content_type=self.suggested_content_type,
+            suggested_duration=self.suggested_duration,
+            suggested_sandbox_type=self.suggested_sandbox_type,
             extracted_metadata=self.extracted_metadata,
             similar_content=self.similar_content,
             similarity_score=self.similarity_score,
@@ -111,10 +120,13 @@ class WorkflowState(BaseModel):
             user_id=agent_state.get("user_id"),
             model_provider=agent_state.get("model_provider", "openai"),
             model_name=agent_state.get("model_name", "gpt-4"),
+            title=agent_state.get("title"),
             suggested_tier=agent_state.get("suggested_tier"),
             suggested_tags=agent_state.get("suggested_tags", []),
             suggested_personas=agent_state.get("suggested_personas", []),
             suggested_content_type=agent_state.get("suggested_content_type"),
+            suggested_duration=agent_state.get("suggested_duration"),
+            suggested_sandbox_type=agent_state.get("suggested_sandbox_type"),
             extracted_metadata=agent_state.get("extracted_metadata", {}),
             similar_content=agent_state.get("similar_content", []),
             similarity_score=agent_state.get("similarity_score"),

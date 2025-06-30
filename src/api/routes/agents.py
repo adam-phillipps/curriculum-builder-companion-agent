@@ -13,6 +13,7 @@ class ContentSubmissionRequest(BaseModel):
     model_config = {"protected_namespaces": ()}
     
     content: str
+    title: Optional[str] = None
     user_id: Optional[str] = None
     model_provider: str = "openai"
     model_name: str = "gpt-4"
@@ -20,6 +21,8 @@ class ContentSubmissionRequest(BaseModel):
     suggested_tags: List[str] = []
     suggested_personas: List[str] = []
     suggested_content_type: Optional[str] = None
+    suggested_duration: Optional[int] = None
+    suggested_sandbox_type: Optional[str] = None
 
 class ContentSubmissionResponse(BaseModel):
     workflow_id: str
@@ -42,13 +45,16 @@ async def process_content(
         # Create initial workflow state
         initial_state = WorkflowState(
             raw_content=request.content,
+            title=request.title,
             user_id=request.user_id,
             model_provider=request.model_provider,
             model_name=request.model_name,
             suggested_tier=request.suggested_tier,
             suggested_tags=request.suggested_tags,
             suggested_personas=request.suggested_personas,
-            suggested_content_type=request.suggested_content_type
+            suggested_content_type=request.suggested_content_type,
+            suggested_duration=request.suggested_duration,
+            suggested_sandbox_type=request.suggested_sandbox_type
         )
         
         # Process through workflow
