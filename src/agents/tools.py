@@ -185,7 +185,7 @@ def _extract_from_text(text: str, suggested_tier: str, suggested_personas: List[
     
     # Estimate duration based on content length
     word_count = len(text.split())
-    estimated_duration = max(30, min(180, word_count // 10))  # 30-180 minutes
+    estimated_duration = max(30, min(180, word_count // 5))  # 30-180 minutes, ~5 words per minute reading
     
     return {
         "title": "Learning Content",
