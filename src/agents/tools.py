@@ -104,26 +104,57 @@ async def extract_metadata_from_content(
 async def _search_similar_content(
     metadata: Dict[str, Any],
     db_session: AsyncSession,
-    threshold: float = 0.85
+    threshold: float = 0.85,
+    query_text: str = ""
 ) -> List[Dict[str, Any]]:
-    """Internal function to search for similar content in database."""
+    """Internal function to search for similar content using vector store."""
     
-    print(f"DEBUG: Searching with metadata: {metadata}")
+    from src.services.vector_store import vector_store
     
-    # Simple metadata-based similarity for now
-    filters = {
-        "tier": metadata.get("tier"),
-        "content_type": metadata.get("content_type")
-    }
-    
-    print(f"DEBUG: Using filters: {filters}")
+    print(f"DEBUG: Vector searching with metadata: {metadata}")
     
     try:
+        # Create search query from metadata
+        search_query = query_text or f"{metadata.get('title', '')} {metadata.get('description', '')}"
+        
+        # Prepare metadata filters for ChromaDB
+        filters = {}
+        if metadata.get("tier"):
+            filters["tier"] = metadata["tier"]
+        if metadata.get("content_type"):
+            filters["content_type"] = metadata["content_type"]
+        if metadata.get("estimated_duration"):
+            filters["estimated_duration"] = metadata["estimated_duration"]
+        
+        # Search vector store
+        similar_items = vector_store.find_similar_content(
+            query_text=search_query,
+            metadata_filters=filters,
+            similarity_threshold=threshold,
+            max_results=5,
+            search_approved_only=True
+        )
+        
+        print(f"DEBUG: Vector search found {len(similar_items)} similar items")
+        return similar_items
+        
+    except Exception as e:
+        print(f"DEBUG: Error in vector similarity search: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Fallback to database search
+        print("DEBUG: Falling back to database search")
+        filters = {
+            "tier": metadata.get("tier"),
+            "content_type": metadata.get("content_type")
+        }
+        
         similar_items = await get_contents(db_session, filters, limit=5)
         
-        result = [
+        return [
             {
-                "id": item.id,
+                "content_id": item.id,
                 "title": item.title,
                 "similarity_score": 0.7,  # Placeholder
                 "tier": item.tier,
@@ -131,15 +162,6 @@ async def _search_similar_content(
             }
             for item in similar_items
         ]
-        
-        print(f"DEBUG: Found {len(result)} similar items")
-        return result
-        
-    except Exception as e:
-        print(f"DEBUG: Error in similarity search: {e}")
-        import traceback
-        traceback.print_exc()
-        return []
 
 async def _create_learning_content(
     metadata: Dict[str, Any],
@@ -147,7 +169,9 @@ async def _create_learning_content(
     db_session: AsyncSession,
     user_id: Optional[str] = None
 ) -> int:
-    """Internal function to create learning content in database."""
+    """Internal function to create learning content in database and vector store."""
+    
+    from src.services.vector_store import vector_store
     
     # Generate unique code_title
     import random
@@ -169,7 +193,24 @@ async def _create_learning_content(
         status="draft"
     )
     
+    # Create in database
     db_content = await create_content(db_session, content_data)
+    
+    # Add to vector store (draft collection)
+    try:
+        vector_id = vector_store.add_content(
+            content_id=db_content.id,
+            title=metadata["title"],
+            description=metadata["description"],
+            content_text=raw_content,
+            metadata=metadata,
+            is_approved=False  # Draft content
+        )
+        print(f"DEBUG: Added content to vector store with ID: {vector_id}")
+    except Exception as e:
+        print(f"DEBUG: Error adding to vector store: {e}")
+        # Continue without vector store - not critical for MVP
+    
     return db_content.id
 
 def _extract_from_text(text: str, suggested_tier: str, suggested_personas: List[str], suggested_content_type: str) -> Dict[str, Any]:
@@ -207,10 +248,11 @@ def create_content_tools(db_session: AsyncSession):
     @tool
     async def search_similar_content(
         metadata: Dict[str, Any],
-        threshold: float = 0.85
+        threshold: float = 0.85,
+        query_text: str = ""
     ) -> List[Dict[str, Any]]:
-        """Search for similar content in database."""
-        return await _search_similar_content(metadata, db_session, threshold)
+        """Search for similar content using vector store."""
+        return await _search_similar_content(metadata, db_session, threshold, query_text)
     
     @tool
     async def create_learning_content(
