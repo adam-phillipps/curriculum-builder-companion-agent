@@ -66,6 +66,13 @@ class LearningContent(Base, TimestampMixin, MetadataMixin):
 
     tags = Column(JSON, nullable=True)
     notes = Column(Text, nullable=True)
+    
+    # Author and source information
+    author = Column(String, nullable=True)
+    co_authors = Column(JSON, nullable=True)  # List of co-author names
+    sources = Column(Text, nullable=True)
+    artifacts = Column(Text, nullable=True)  # Links to supplementary materials
+    ai_assisted = Column(String, nullable=True)  # AI tools used in creation
 
     pricing_estimates = relationship("PricingEstimate", back_populates="content")
     pathway_items = relationship("PathwayItem", back_populates="content")

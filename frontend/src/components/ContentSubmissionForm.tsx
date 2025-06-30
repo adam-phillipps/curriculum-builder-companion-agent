@@ -22,6 +22,11 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
     suggested_tags: [],
     suggested_duration: 60,
     suggested_sandbox_type: 'individual',
+    author: '',
+    co_authors: '',
+    sources: '',
+    artifacts: '',
+    ai_assisted: '',
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -212,6 +217,87 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
             disabled={disabled}
           />
           <p className="text-xs text-gray-500 mt-1">Separate multiple tags with commas</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-2">
+              Author
+            </label>
+            <input
+              id="author"
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="e.g., John Smith, jane.doe@company.com"
+              value={formData.author || ''}
+              onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+              disabled={disabled}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="co_authors" className="block text-sm font-medium text-gray-700 mb-2">
+              Co-Authors
+            </label>
+            <input
+              id="co_authors"
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="e.g., Alice Johnson, Bob Wilson"
+              value={formData.co_authors || ''}
+              onChange={(e) => setFormData({ ...formData, co_authors: e.target.value })}
+              disabled={disabled}
+            />
+            <p className="text-xs text-gray-500 mt-1">Separate multiple co-authors with commas</p>
+          </div>
+
+          <div>
+            <label htmlFor="sources" className="block text-sm font-medium text-gray-700 mb-2">
+              Sources & References
+            </label>
+            <textarea
+              id="sources"
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="e.g., AWS Documentation, https://docs.aws.amazon.com/lambda/"
+              value={formData.sources || ''}
+              onChange={(e) => setFormData({ ...formData, sources: e.target.value })}
+              disabled={disabled}
+            />
+            <p className="text-xs text-gray-500 mt-1">Links, documentation, or other reference materials</p>
+          </div>
+
+          <div>
+            <label htmlFor="artifacts" className="block text-sm font-medium text-gray-700 mb-2">
+              Additional Artifacts
+            </label>
+            <textarea
+              id="artifacts"
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="e.g., https://youtube.com/watch?v=example, https://datasets.example.com/data.zip"
+              value={formData.artifacts || ''}
+              onChange={(e) => setFormData({ ...formData, artifacts: e.target.value })}
+              disabled={disabled}
+            />
+            <p className="text-xs text-gray-500 mt-1">Links to videos, datasets, or other supplementary materials</p>
+          </div>
+
+          <div>
+            <label htmlFor="ai_assisted" className="block text-sm font-medium text-gray-700 mb-2">
+              AI Assistance Credit
+            </label>
+            <input
+              id="ai_assisted"
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="e.g., ChatGPT-4, Claude 3.5, GitHub Copilot"
+              value={formData.ai_assisted || ''}
+              onChange={(e) => setFormData({ ...formData, ai_assisted: e.target.value })}
+              disabled={disabled}
+            />
+            <p className="text-xs text-gray-500 mt-1">Credit AI tools used in content creation</p>
+          </div>
         </div>
 
         {error && (

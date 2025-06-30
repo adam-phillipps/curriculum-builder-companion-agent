@@ -62,6 +62,11 @@ class ContentProcessingWorkflow:
                 "suggested_tags": state.get("suggested_tags", []),
                 "suggested_duration": state.get("suggested_duration"),
                 "suggested_sandbox_type": state.get("suggested_sandbox_type"),
+                "author": state.get("author"),
+                "co_authors": state.get("co_authors"),
+                "sources": state.get("sources"),
+                "artifacts": state.get("artifacts"),
+                "ai_assisted": state.get("ai_assisted"),
                 "model_provider": state.get("model_provider", "openai"),
                 "model_name": state.get("model_name", "gpt-4")
             })

@@ -23,6 +23,11 @@ class ContentSubmissionRequest(BaseModel):
     suggested_content_type: Optional[str] = None
     suggested_duration: Optional[int] = None
     suggested_sandbox_type: Optional[str] = None
+    author: Optional[str] = None
+    co_authors: Optional[str] = None
+    sources: Optional[str] = None
+    artifacts: Optional[str] = None
+    ai_assisted: Optional[str] = None
 
 class ContentSubmissionResponse(BaseModel):
     workflow_id: str
@@ -54,7 +59,12 @@ async def process_content(
             suggested_personas=request.suggested_personas,
             suggested_content_type=request.suggested_content_type,
             suggested_duration=request.suggested_duration,
-            suggested_sandbox_type=request.suggested_sandbox_type
+            suggested_sandbox_type=request.suggested_sandbox_type,
+            author=request.author,
+            co_authors=request.co_authors,
+            sources=request.sources,
+            artifacts=request.artifacts,
+            ai_assisted=request.ai_assisted
         )
         
         # Process through workflow

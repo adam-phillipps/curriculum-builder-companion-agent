@@ -10,6 +10,11 @@ export interface ContentSubmissionRequest {
   suggested_tags?: string[];
   suggested_duration?: number;
   suggested_sandbox_type?: string;
+  author?: string;
+  co_authors?: string;
+  sources?: string;
+  artifacts?: string;
+  ai_assisted?: string;
 }
 
 export interface ContentSubmissionResponse {

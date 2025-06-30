@@ -29,6 +29,11 @@ class AgentState(TypedDict):
     suggested_content_type: Annotated[Optional[str], "User suggested content type"]
     suggested_duration: Annotated[Optional[int], "User suggested duration in minutes"]
     suggested_sandbox_type: Annotated[Optional[str], "User suggested sandbox environment"]
+    author: Annotated[Optional[str], "Content author"]
+    co_authors: Annotated[Optional[str], "Additional contributors"]
+    sources: Annotated[Optional[str], "Reference sources and materials"]
+    artifacts: Annotated[Optional[str], "Links to supplementary materials"]
+    ai_assisted: Annotated[Optional[str], "AI tools used in content creation"]
     
     # Extracted metadata
     extracted_metadata: Annotated[Dict[str, Any], "AI extracted metadata"]
@@ -67,6 +72,11 @@ class WorkflowState(BaseModel):
     suggested_content_type: Optional[str] = None
     suggested_duration: Optional[int] = None
     suggested_sandbox_type: Optional[str] = None
+    author: Optional[str] = None
+    co_authors: Optional[str] = None
+    sources: Optional[str] = None
+    artifacts: Optional[str] = None
+    ai_assisted: Optional[str] = None
     
     # Extracted metadata
     extracted_metadata: Dict[str, Any] = {}
@@ -101,6 +111,11 @@ class WorkflowState(BaseModel):
             suggested_content_type=self.suggested_content_type,
             suggested_duration=self.suggested_duration,
             suggested_sandbox_type=self.suggested_sandbox_type,
+            author=self.author,
+            co_authors=self.co_authors,
+            sources=self.sources,
+            artifacts=self.artifacts,
+            ai_assisted=self.ai_assisted,
             extracted_metadata=self.extracted_metadata,
             similar_content=self.similar_content,
             similarity_score=self.similarity_score,
@@ -127,6 +142,11 @@ class WorkflowState(BaseModel):
             suggested_content_type=agent_state.get("suggested_content_type"),
             suggested_duration=agent_state.get("suggested_duration"),
             suggested_sandbox_type=agent_state.get("suggested_sandbox_type"),
+            author=agent_state.get("author"),
+            co_authors=agent_state.get("co_authors"),
+            sources=agent_state.get("sources"),
+            artifacts=agent_state.get("artifacts"),
+            ai_assisted=agent_state.get("ai_assisted"),
             extracted_metadata=agent_state.get("extracted_metadata", {}),
             similar_content=agent_state.get("similar_content", []),
             similarity_score=agent_state.get("similarity_score"),

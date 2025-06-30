@@ -43,6 +43,11 @@ async def extract_metadata_from_content(
     suggested_tags: List[str] = [],
     suggested_duration: Optional[int] = None,
     suggested_sandbox_type: Optional[str] = None,
+    author: Optional[str] = None,
+    co_authors: Optional[str] = None,
+    sources: Optional[str] = None,
+    artifacts: Optional[str] = None,
+    ai_assisted: Optional[str] = None,
     model_provider: str = "openai",
     model_name: str = "gpt-4"
 ) -> Dict[str, Any]:
@@ -70,6 +75,11 @@ async def extract_metadata_from_content(
     - Tags: {suggested_tags or 'Not specified'}
     - Duration: {suggested_duration or 'Not specified'} minutes
     - Sandbox: {suggested_sandbox_type or 'Not specified'}
+    - Author: {author or 'Not specified'}
+    - Co-Authors: {co_authors or 'Not specified'}
+    - Sources: {sources or 'Not specified'}
+    - Artifacts: {artifacts or 'Not specified'}
+    - AI Assisted: {ai_assisted or 'Not specified'}
     
     AVAILABLE OPTIONS:
     - Tiers: {tiers} (T1=Foundational, T2=Intermediate, T3=Advanced, T4=Expert)
@@ -99,7 +109,7 @@ async def extract_metadata_from_content(
     print(f"DEBUG: Skipping LLM call, using fallback metadata")
     
     # Return fallback metadata based on content analysis
-    return _extract_from_text(content, title, suggested_tier, suggested_personas, suggested_content_type, suggested_tags, suggested_duration, suggested_sandbox_type)
+    return _extract_from_text(content, title, suggested_tier, suggested_personas, suggested_content_type, suggested_tags, suggested_duration, suggested_sandbox_type, author, co_authors, sources, artifacts, ai_assisted)
     
     # TODO: Re-enable LLM extraction once we have proper API keys and error handling
     # try:
@@ -232,7 +242,12 @@ def _extract_from_text(
     suggested_content_type: Optional[str],
     suggested_tags: List[str],
     suggested_duration: Optional[int],
-    suggested_sandbox_type: Optional[str]
+    suggested_sandbox_type: Optional[str],
+    author: Optional[str],
+    co_authors: Optional[str],
+    sources: Optional[str],
+    artifacts: Optional[str],
+    ai_assisted: Optional[str]
 ) -> Dict[str, Any]:
     """Extract metadata from plain text response as fallback."""
     # Simple text analysis fallback
@@ -271,7 +286,12 @@ def _extract_from_text(
         "aws_services": aws_services,
         "technical_requirements": {"runtime": "python3.9"},
         "estimated_cost": 5.0,
-        "tags": suggested_tags or []
+        "tags": suggested_tags or [],
+        "author": author,
+        "co_authors": co_authors.split(',') if co_authors else [],
+        "sources": sources,
+        "artifacts": artifacts,
+        "ai_assisted": ai_assisted
     }
 
 def create_content_tools(db_session: AsyncSession):
