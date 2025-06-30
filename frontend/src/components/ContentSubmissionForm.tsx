@@ -51,11 +51,21 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
           <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
             Learning Content *
           </label>
+          <div className="mb-2 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p><strong>📚 Submit Your Complete Learning Content</strong></p>
+            <p>Paste the full learning material that students will use to learn. This could be:</p>
+            <ul className="list-disc list-inside mt-1 text-xs">
+              <li>Tutorial text with step-by-step instructions</li>
+              <li>Course module content with explanations and examples</li>
+              <li>Lab exercise instructions and code samples</li>
+              <li>Complete lesson content ready for learners</li>
+            </ul>
+          </div>
           <textarea
             id="content"
-            rows={6}
+            rows={8}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            placeholder="Paste your learning content here..."
+            placeholder="Example: 'AWS Lambda Tutorial - Getting Started\n\nIn this tutorial, you will learn how to create your first AWS Lambda function using Python. We will cover:\n\n1. Setting up your development environment\n2. Creating a basic Lambda function\n3. Testing your function locally\n4. Deploying to AWS...'"
             value={formData.content}
             onChange={(e) => setFormData({ ...formData, content: e.target.value })}
             required

@@ -104,7 +104,7 @@ async def extract_metadata_from_content(
 async def _search_similar_content(
     metadata: Dict[str, Any],
     db_session: AsyncSession,
-    threshold: float = 0.85,
+    threshold: float = 0.3,
     query_text: str = ""
 ) -> List[Dict[str, Any]]:
     """Internal function to search for similar content using vector store."""
@@ -126,13 +126,13 @@ async def _search_similar_content(
         if metadata.get("estimated_duration"):
             filters["estimated_duration"] = metadata["estimated_duration"]
         
-        # Search vector store
+        # Search vector store (search both approved and draft content)
         similar_items = vector_store.find_similar_content(
             query_text=search_query,
             metadata_filters=filters,
             similarity_threshold=threshold,
             max_results=5,
-            search_approved_only=True
+            search_approved_only=False
         )
         
         print(f"DEBUG: Vector search found {len(similar_items)} similar items")
@@ -201,8 +201,8 @@ async def _create_learning_content(
     try:
         vector_id = vector_store.add_content(
             content_id=db_content.id,
-            title=metadata["title"],
-            description=metadata["description"],
+            title=metadata.get("title", "Learning Content"),
+            description=metadata.get("description", "Generated learning content"),
             content_text=raw_content,
             metadata=metadata,
             is_approved=False  # Draft content
@@ -210,6 +210,8 @@ async def _create_learning_content(
         print(f"DEBUG: Added content to vector store with ID: {vector_id}")
     except Exception as e:
         print(f"DEBUG: Error adding to vector store: {e}")
+        import traceback
+        traceback.print_exc()
         # Continue without vector store - not critical for MVP
     
     return db_content.id
@@ -249,7 +251,7 @@ def create_content_tools(db_session: AsyncSession):
     @tool
     async def search_similar_content(
         metadata: Dict[str, Any],
-        threshold: float = 0.85,
+        threshold: float = 0.3,
         query_text: str = ""
     ) -> List[Dict[str, Any]]:
         """Search for similar content using vector store."""

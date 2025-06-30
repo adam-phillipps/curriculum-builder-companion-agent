@@ -35,7 +35,7 @@ export default function ContentSearch({ onContentSelect }: Props) {
     tier: '',
     content_type: '',
     search_approved_only: false,
-    similarity_threshold: 0.5
+    similarity_threshold: 0.3
   });
   const [showFilters, setShowFilters] = useState(false);
 
