@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from src.db.init import initialize_database
 from src.api.routes import content, agents, vector_store
 
@@ -15,6 +16,15 @@ app = FastAPI(
     description="AI-powered curriculum building and analysis platform",
     version="1.0.0",
     lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://frontend:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(content.router)

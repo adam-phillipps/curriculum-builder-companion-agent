@@ -13,9 +13,9 @@ class SimilaritySearchRequest(BaseModel):
     """Request model for similarity search."""
     query_text: str
     metadata_filters: Optional[Dict[str, Any]] = None
-    similarity_threshold: float = 0.8
+    similarity_threshold: float = 0.3
     max_results: int = 10
-    search_approved_only: bool = True
+    search_approved_only: bool = False
 
 class SimilaritySearchResponse(BaseModel):
     """Response model for similarity search."""
@@ -75,3 +75,25 @@ async def vector_store_health():
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Vector store unhealthy: {str(e)}")
+
+@router.get("/debug")
+async def debug_vector_store():
+    """Debug endpoint to check vector store contents."""
+    try:
+        stats = vector_store.get_content_stats()
+        
+        # Try a simple search to test functionality
+        test_results = vector_store.find_similar_content(
+            query_text="AWS Lambda tutorial",
+            similarity_threshold=0.1,
+            max_results=5,
+            search_approved_only=False
+        )
+        
+        return {
+            "stats": stats,
+            "test_search_results": len(test_results),
+            "sample_results": test_results[:2] if test_results else []
+        }
+    except Exception as e:
+        return {"error": str(e)}

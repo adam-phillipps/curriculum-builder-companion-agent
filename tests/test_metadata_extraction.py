@@ -8,7 +8,7 @@ class TestMetadataExtraction:
     def test_extract_from_text_basic(self):
         """Test basic text extraction."""
         content = "Learn AWS Lambda basics with Python"
-        result = _extract_from_text(content, "T2", ["developer"], "lesson")
+        result = _extract_from_text(content, None, "T2", ["developer"], "lesson", [], None, None, None, None, None, None, None)
         
         assert result["tier"] == "T2"
         assert result["personas"] == ["developer"]
@@ -19,7 +19,7 @@ class TestMetadataExtraction:
     def test_extract_aws_services(self):
         """Test AWS service detection."""
         content = "Use S3 for storage, Lambda for compute, and EC2 for servers"
-        result = _extract_from_text(content, "T2", ["developer"], "lesson")
+        result = _extract_from_text(content, None, "T2", ["developer"], "lesson", [], None, None, None, None, None, None, None)
         
         assert "S3" in result["aws_services"]
         assert "Lambda" in result["aws_services"]
@@ -30,8 +30,8 @@ class TestMetadataExtraction:
         short_content = "Short lesson"
         long_content = " ".join(["word"] * 200)  # 200 words
         
-        short_result = _extract_from_text(short_content, "T1", ["developer"], "lesson")
-        long_result = _extract_from_text(long_content, "T1", ["developer"], "lesson")
+        short_result = _extract_from_text(short_content, None, "T1", ["developer"], "lesson", [], None, None, None, None, None, None, None)
+        long_result = _extract_from_text(long_content, None, "T1", ["developer"], "lesson", [], None, None, None, None, None, None, None)
         
         assert short_result["estimated_duration"] == 30  # Minimum
         assert long_result["estimated_duration"] > short_result["estimated_duration"]
@@ -40,7 +40,7 @@ class TestMetadataExtraction:
     def test_fallback_values(self):
         """Test fallback values when suggestions are None."""
         content = "Basic content"
-        result = _extract_from_text(content, None, None, None)
+        result = _extract_from_text(content, None, None, None, None, [], None, None, None, None, None, None, None)
         
         assert result["tier"] == "T2"  # Default
         assert result["personas"] == ["developer"]  # Default
@@ -50,7 +50,7 @@ class TestMetadataExtraction:
     def test_description_truncation(self):
         """Test description truncation for long content."""
         long_content = "a" * 300  # 300 characters
-        result = _extract_from_text(long_content, "T1", ["developer"], "lesson")
+        result = _extract_from_text(long_content, None, "T1", ["developer"], "lesson", [], None, None, None, None, None, None, None)
         
         assert len(result["description"]) <= 203  # 200 + "..."
         assert result["description"].endswith("...")
@@ -58,7 +58,7 @@ class TestMetadataExtraction:
     def test_technical_requirements(self):
         """Test technical requirements are set."""
         content = "Python tutorial"
-        result = _extract_from_text(content, "T2", ["developer"], "lesson")
+        result = _extract_from_text(content, None, "T2", ["developer"], "lesson", [], None, None, None, None, None, None, None)
         
         assert "runtime" in result["technical_requirements"]
         assert result["technical_requirements"]["runtime"] == "python3.9"

@@ -103,9 +103,9 @@ class LearningContentResponse(LearningContentBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    created_by: str
+    created_by: Optional[str] = None
     updated_by: Optional[str] = None
-    version: str
+    version: Optional[str] = None
     prerequisites: List['LearningContentBase']
     assessment_questions: List[AssessmentQuestionBase]
     review_status: Optional[Dict[str, Any]] = None

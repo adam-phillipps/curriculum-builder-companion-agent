@@ -25,10 +25,19 @@ class VectorStoreService:
         """Lazy initialization of ChromaDB client."""
         if self._client is None:
             try:
-                # Use PersistentClient for reliable operation
-                self._client = chromadb.PersistentClient(
-                    path="/tmp/chroma_data"
-                )
+                # Try PersistentClient first, fallback to HttpClient
+                try:
+                    # For development, use PersistentClient with shared volume
+                    self._client = chromadb.PersistentClient(
+                        path="/tmp/chroma_data"
+                    )
+                except Exception as e:
+                    print(f"PersistentClient failed: {e}, trying HttpClient...")
+                    # Fallback to HttpClient
+                    self._client = chromadb.HttpClient(
+                        host=settings.CHROMA_HOST,
+                        port=settings.CHROMA_PORT
+                    )
                 # Test connection
                 self._client.heartbeat()
             except Exception as e:
@@ -56,7 +65,8 @@ class VectorStoreService:
         """Get or create a ChromaDB collection."""
         try:
             return self.client.get_collection(name=name)
-        except Exception:
+        except Exception as e:
+            print(f"Collection {name} not found, creating: {e}")
             return self.client.create_collection(
                 name=name,
                 metadata={"description": f"Learning content collection: {name}"}
@@ -108,11 +118,24 @@ class VectorStoreService:
         collection = self.approved_collection if is_approved else self.draft_collection
         
         # Add to ChromaDB
-        collection.add(
-            documents=[document],
-            metadatas=[vector_metadata],
-            ids=[vector_id]
-        )
+        try:
+            collection.add(
+                documents=[document],
+                metadatas=[vector_metadata],
+                ids=[vector_id]
+            )
+        except Exception as e:
+            print(f"Error adding to ChromaDB collection: {e}")
+            # Try to handle duplicate IDs
+            if "already exists" in str(e).lower():
+                # Update existing entry
+                collection.update(
+                    documents=[document],
+                    metadatas=[vector_metadata],
+                    ids=[vector_id]
+                )
+            else:
+                raise
         
         return vector_id
     
@@ -120,60 +143,75 @@ class VectorStoreService:
         self,
         query_text: str,
         metadata_filters: Optional[Dict[str, Any]] = None,
-        similarity_threshold: float = 0.8,
+        similarity_threshold: float = 0.3,
         max_results: int = 10,
-        search_approved_only: bool = True
+        search_approved_only: bool = False
     ) -> List[Dict[str, Any]]:
         """Find similar content using vector similarity and metadata filtering."""
         
-        # Choose collection to search
-        collection = self.approved_collection if search_approved_only else self.draft_collection
+        # Search both collections if not restricted to approved only
+        collections_to_search = []
+        if search_approved_only:
+            collections_to_search = [self.approved_collection]
+        else:
+            collections_to_search = [self.approved_collection, self.draft_collection]
         
-        # Build ChromaDB where clause from filters
+        # Build ChromaDB where clause from filters (simplified for compatibility)
         where_clause = {}
         if metadata_filters:
             for key, value in metadata_filters.items():
                 if key in ["tier", "content_type", "sandbox_type"] and value:
                     where_clause[key] = value
-                elif key == "estimated_duration" and value:
-                    # Range query for duration (±30 minutes)
-                    where_clause["estimated_duration"] = {"$gte": value - 30, "$lte": value + 30}
+                # Skip complex range queries that cause ChromaDB issues
         
         try:
-            # Query ChromaDB
-            results = collection.query(
-                query_texts=[query_text],
-                n_results=max_results,
-                where=where_clause if where_clause else None
-            )
+            # Search across all specified collections
+            all_similar_items = []
             
-            # Process results
-            similar_items = []
-            if results["documents"] and results["documents"][0]:
-                for i, (doc, metadata, distance) in enumerate(zip(
-                    results["documents"][0],
-                    results["metadatas"][0], 
-                    results["distances"][0]
-                )):
-                    # Convert distance to similarity score (ChromaDB uses cosine distance)
-                    similarity_score = 1 - distance
+            for collection in collections_to_search:
+                try:
+                    # Query ChromaDB
+                    results = collection.query(
+                        query_texts=[query_text],
+                        n_results=max_results,
+                        where=where_clause if where_clause else None
+                    )
                     
-                    # Filter by similarity threshold
-                    if similarity_score >= similarity_threshold:
-                        similar_items.append({
-                            "content_id": metadata["content_id"],
-                            "title": metadata["title"],
-                            "description": metadata["description"],
-                            "tier": metadata["tier"],
-                            "content_type": metadata["content_type"],
-                            "similarity_score": round(similarity_score, 3),
-                            "personas": json.loads(metadata.get("personas", "[]")),
-                            "aws_services": json.loads(metadata.get("aws_services", "[]")),
-                            "estimated_duration": metadata["estimated_duration"],
-                            "estimated_cost": metadata["estimated_cost"]
-                        })
+                    # Process results
+                    if results["documents"] and results["documents"][0]:
+                        for i, (doc, metadata, distance) in enumerate(zip(
+                            results["documents"][0],
+                            results["metadatas"][0], 
+                            results["distances"][0]
+                        )):
+                            # Convert distance to similarity score
+                            # ChromaDB uses squared euclidean distance, convert to similarity (0-1)
+                            # Lower distance = higher similarity
+                            similarity_score = max(0, 1 / (1 + distance))  # Normalize distance to 0-1 range
+                            
+                            # Filter by similarity threshold
+                            if similarity_score >= similarity_threshold:
+                                all_similar_items.append({
+                                    "content_id": metadata["content_id"],
+                                    "title": metadata["title"],
+                                    "description": metadata["description"],
+                                    "tier": metadata["tier"],
+                                    "content_type": metadata["content_type"],
+                                    "similarity_score": round(similarity_score, 3),
+                                    "personas": json.loads(metadata.get("personas", "[]")),
+                                    "aws_services": json.loads(metadata.get("aws_services", "[]")),
+                                    "estimated_duration": metadata["estimated_duration"],
+                                    "estimated_cost": metadata["estimated_cost"]
+                                })
+                except Exception as e:
+                    print(f"Error querying collection: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
             
-            return similar_items
+            # Sort by similarity score and limit results
+            all_similar_items.sort(key=lambda x: x["similarity_score"], reverse=True)
+            return all_similar_items[:max_results]
             
         except Exception as e:
             print(f"Error searching similar content: {e}")

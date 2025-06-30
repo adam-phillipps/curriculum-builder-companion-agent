@@ -7,9 +7,11 @@ interface Props {
   result: ContentSubmissionResponse | null;
   isProcessing: boolean;
   onReset: () => void;
+  onReviewContent?: (result: ContentSubmissionResponse) => void;
+  onQuickApprove?: (contentId: number) => void;
 }
 
-export default function WorkflowProgress({ result, isProcessing, onReset }: Props) {
+export default function WorkflowProgress({ result, isProcessing, onReset, onReviewContent, onQuickApprove }: Props) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'published':
@@ -125,10 +127,28 @@ export default function WorkflowProgress({ result, isProcessing, onReset }: Prop
           {/* Human Review Required */}
           {result.human_review_required && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <h3 className="font-medium text-orange-800 mb-2">Human Review Required</h3>
-              <p className="text-sm text-orange-600">
-                This content requires human review before publication due to high similarity scores or other factors.
-              </p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-medium text-orange-800 mb-2">Human Review Required</h3>
+                  <p className="text-sm text-orange-600 mb-3">
+                    This content requires human review before publication due to high similarity scores or other factors.
+                  </p>
+                </div>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => onReviewContent?.(result)}
+                  className="btn-primary bg-orange-600 hover:bg-orange-700 text-sm"
+                >
+                  Review Content
+                </button>
+                <button
+                  onClick={() => onQuickApprove?.(result.content_id!)}
+                  className="btn-secondary text-sm"
+                >
+                  Quick Approve
+                </button>
+              </div>
             </div>
           )}
 

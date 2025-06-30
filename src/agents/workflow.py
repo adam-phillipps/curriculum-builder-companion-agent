@@ -55,9 +55,18 @@ class ContentProcessingWorkflow:
             # Call the tool with proper parameter mapping
             metadata = await extract_metadata_from_content.ainvoke({
                 "content": state["raw_content"],
+                "title": state.get("title"),
                 "suggested_tier": state.get("suggested_tier"),
                 "suggested_personas": state.get("suggested_personas", []),
                 "suggested_content_type": state.get("suggested_content_type"),
+                "suggested_tags": state.get("suggested_tags", []),
+                "suggested_duration": state.get("suggested_duration"),
+                "suggested_sandbox_type": state.get("suggested_sandbox_type"),
+                "author": state.get("author"),
+                "co_authors": state.get("co_authors"),
+                "sources": state.get("sources"),
+                "artifacts": state.get("artifacts"),
+                "ai_assisted": state.get("ai_assisted"),
                 "model_provider": state.get("model_provider", "openai"),
                 "model_name": state.get("model_name", "gpt-4")
             })
