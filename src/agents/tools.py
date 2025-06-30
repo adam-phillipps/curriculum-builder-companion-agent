@@ -53,52 +53,53 @@ async def extract_metadata_from_content(
     sandbox_types = BuilderConstants.SANDBOX_TYPES.get_names()
     
     prompt = f"""
-    Analyze this learning content and extract metadata:
+    You are an expert curriculum designer. Analyze this learning content and extract structured metadata.
     
-    Content: {content}
+    CONTENT TO ANALYZE:
+    {content}
     
-    User suggestions:
+    USER SUGGESTIONS:
     - Tier: {suggested_tier or 'Not specified'}
     - Personas: {suggested_personas or 'Not specified'}
     - Content Type: {suggested_content_type or 'Not specified'}
     
-    Available options:
-    - Tiers: {tiers}
+    AVAILABLE OPTIONS:
+    - Tiers: {tiers} (T1=Foundational, T2=Intermediate, T3=Advanced, T4=Expert)
     - Personas: {personas}
     - Content Types: {content_types}
     - Sandbox Types: {sandbox_types}
     
-    Extract and return JSON with:
-    - title: Clear, concise title
-    - description: 2-3 sentence summary
-    - tier: Choose from available tiers (prefer user suggestion if valid)
-    - personas: List of relevant personas
-    - content_type: Choose from available types
-    - learning_objectives: List of 3-5 specific objectives
-    - estimated_duration: Minutes to complete
-    - sandbox_type: Required sandbox environment
-    - aws_services: List of AWS services mentioned
-    - technical_requirements: Dict of technical needs
-    - estimated_cost: Rough cost estimate in USD
+    RESPOND WITH VALID JSON ONLY:
+    {{
+        "title": "Clear, concise title (max 60 chars)",
+        "description": "2-3 sentence summary describing what learners will do",
+        "tier": "Choose from {tiers} - prefer user suggestion if valid",
+        "personas": ["List of 1-3 most relevant personas from {personas}"],
+        "content_type": "Choose from {content_types}",
+        "learning_objectives": ["3-5 specific, measurable learning objectives"],
+        "estimated_duration": 60,
+        "sandbox_type": "Choose from {sandbox_types}",
+        "aws_services": ["List AWS services mentioned in content"],
+        "technical_requirements": {{"runtime": "python3.9", "other": "requirements"}},
+        "estimated_cost": 5.0
+    }}
+    
+    Return ONLY the JSON object, no other text.
     """
     
-    response = await llm.ainvoke(prompt)
+    # For now, skip LLM and return fallback metadata to test the workflow
+    print(f"DEBUG: Skipping LLM call, using fallback metadata")
     
-    # Parse LLM response (simplified for now)
-    # In production, use structured output or JSON parsing
-    return {
-        "title": "Extracted Title",
-        "description": "Extracted description",
-        "tier": suggested_tier or "T2",
-        "personas": suggested_personas or ["developer"],
-        "content_type": suggested_content_type or "lesson",
-        "learning_objectives": ["Learn basics", "Apply concepts"],
-        "estimated_duration": 60,
-        "sandbox_type": "individual",
-        "aws_services": ["Lambda"],
-        "technical_requirements": {"runtime": "python3.9"},
-        "estimated_cost": 5.0
-    }
+    # Return fallback metadata based on content analysis
+    return _extract_from_text(content, suggested_tier, suggested_personas, suggested_content_type)
+    
+    # TODO: Re-enable LLM extraction once we have proper API keys and error handling
+    # try:
+    #     response = await llm.ainvoke(prompt)
+    #     # ... LLM processing code ...
+    # except Exception as e:
+    #     print(f"LLM extraction error: {e}")
+    #     return fallback_metadata
 
 async def _search_similar_content(
     metadata: Dict[str, Any],
@@ -107,24 +108,38 @@ async def _search_similar_content(
 ) -> List[Dict[str, Any]]:
     """Internal function to search for similar content in database."""
     
+    print(f"DEBUG: Searching with metadata: {metadata}")
+    
     # Simple metadata-based similarity for now
     filters = {
         "tier": metadata.get("tier"),
         "content_type": metadata.get("content_type")
     }
     
-    similar_items = await get_contents(db_session, filters, limit=5)
+    print(f"DEBUG: Using filters: {filters}")
     
-    return [
-        {
-            "id": item.id,
-            "title": item.title,
-            "similarity_score": 0.7,  # Placeholder
-            "tier": item.tier,
-            "content_type": item.content_type
-        }
-        for item in similar_items
-    ]
+    try:
+        similar_items = await get_contents(db_session, filters, limit=5)
+        
+        result = [
+            {
+                "id": item.id,
+                "title": item.title,
+                "similarity_score": 0.7,  # Placeholder
+                "tier": item.tier,
+                "content_type": item.content_type
+            }
+            for item in similar_items
+        ]
+        
+        print(f"DEBUG: Found {len(result)} similar items")
+        return result
+        
+    except Exception as e:
+        print(f"DEBUG: Error in similarity search: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 async def _create_learning_content(
     metadata: Dict[str, Any],
@@ -156,6 +171,35 @@ async def _create_learning_content(
     
     db_content = await create_content(db_session, content_data)
     return db_content.id
+
+def _extract_from_text(text: str, suggested_tier: str, suggested_personas: List[str], suggested_content_type: str) -> Dict[str, Any]:
+    """Extract metadata from plain text response as fallback."""
+    # Simple text analysis fallback
+    aws_services = []
+    if "lambda" in text.lower():
+        aws_services.append("Lambda")
+    if "s3" in text.lower():
+        aws_services.append("S3")
+    if "ec2" in text.lower():
+        aws_services.append("EC2")
+    
+    # Estimate duration based on content length
+    word_count = len(text.split())
+    estimated_duration = max(30, min(180, word_count // 5))  # 30-180 minutes, ~5 words per minute reading
+    
+    return {
+        "title": "Learning Content",
+        "description": text[:200] + "..." if len(text) > 200 else text,
+        "tier": suggested_tier or "T2",
+        "personas": suggested_personas or ["developer"],
+        "content_type": suggested_content_type or "lesson",
+        "learning_objectives": ["Understand core concepts", "Apply practical skills"],
+        "estimated_duration": estimated_duration,
+        "sandbox_type": "individual",
+        "aws_services": aws_services,
+        "technical_requirements": {"runtime": "python3.9"},
+        "estimated_cost": 5.0
+    }
 
 def create_content_tools(db_session: AsyncSession):
     """Create tools with database session bound - Tool Factory Pattern."""

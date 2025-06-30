@@ -51,14 +51,18 @@ class ContentProcessingWorkflow:
     async def _extract_metadata(self, state: AgentState) -> dict:
         """Extract metadata from raw content."""
         try:
-            metadata = await extract_metadata_from_content(
-                content=state["raw_content"],
-                suggested_tier=state.get("suggested_tier"),
-                suggested_personas=state.get("suggested_personas", []),
-                suggested_content_type=state.get("suggested_content_type"),
-                model_provider=state.get("model_provider", "openai"),
-                model_name=state.get("model_name", "gpt-4")
-            )
+            print(f"DEBUG: Extracting metadata for content: {state['raw_content'][:100]}...")
+            # Call the tool with proper parameter mapping
+            metadata = await extract_metadata_from_content.ainvoke({
+                "content": state["raw_content"],
+                "suggested_tier": state.get("suggested_tier"),
+                "suggested_personas": state.get("suggested_personas", []),
+                "suggested_content_type": state.get("suggested_content_type"),
+                "model_provider": state.get("model_provider", "openai"),
+                "model_name": state.get("model_name", "gpt-4")
+            })
+            
+            print(f"DEBUG: Extracted metadata: {metadata}")
             
             return {
                 "extracted_metadata": metadata,
@@ -66,6 +70,9 @@ class ContentProcessingWorkflow:
             }
             
         except Exception as e:
+            print(f"DEBUG: Metadata extraction error: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "status": WorkflowStatus.ERROR.value,
                 "error_message": str(e)
@@ -74,6 +81,7 @@ class ContentProcessingWorkflow:
     async def _check_similarity(self, state: AgentState) -> dict:
         """Check for similar content."""
         try:
+            print(f"DEBUG: Checking similarity for metadata: {state.get('extracted_metadata', {})}")
             # Get the search tool from our factory
             search_tool = self.content_tools[0]  # search_similar_content
             similar_content = await search_tool.ainvoke({
@@ -87,6 +95,8 @@ class ContentProcessingWorkflow:
                 default=0
             )
             
+            print(f"DEBUG: Found {len(similar_content)} similar items, max score: {max_similarity}")
+            
             return {
                 "similar_content": similar_content,
                 "similarity_score": max_similarity,
@@ -94,6 +104,9 @@ class ContentProcessingWorkflow:
             }
             
         except Exception as e:
+            print(f"DEBUG: Similarity check error: {e}")
+            import traceback
+            traceback.print_exc()
             return {
                 "status": WorkflowStatus.ERROR.value,
                 "error_message": str(e)
