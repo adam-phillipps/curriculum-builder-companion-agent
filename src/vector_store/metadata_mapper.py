@@ -148,6 +148,7 @@ class ChromaMetadataMapper:
     def build_filter_query(cls, filters: Dict[str, Any]) -> Dict[str, Any]:
         """Build ChromaDB-compatible filter query from user filters."""
         chroma_filters = {}
+        filter_conditions = []
         
         for filter_name, filter_value in filters.items():
             if filter_name not in cls.METADATA_SCHEMA:
@@ -164,7 +165,7 @@ class ChromaMetadataMapper:
             elif isinstance(filter_value, list):
                 # Multiple values (OR condition) - ChromaDB uses $in operator
                 if filter_value:
-                    chroma_filters[filter_name] = {"$in": filter_value}
+                    filter_conditions.append({filter_name: {"$in": filter_value}})
             elif filter_value is not None and filter_value != "":
                 # Simple equality
                 if field_def.type == MetadataType.JSON_ARRAY:
@@ -172,7 +173,15 @@ class ChromaMetadataMapper:
                     # This is complex in ChromaDB, so we'll handle it in post-processing
                     continue
                 else:
-                    chroma_filters[filter_name] = filter_value
+                    filter_conditions.append({filter_name: filter_value})
+        
+        # Build proper ChromaDB query with $and operator for multiple conditions
+        if len(filter_conditions) == 0:
+            return {}
+        elif len(filter_conditions) == 1:
+            return filter_conditions[0]
+        else:
+            return {"$and": filter_conditions}
         
         return chroma_filters
     

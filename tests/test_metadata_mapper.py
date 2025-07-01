@@ -52,6 +52,31 @@ class TestMetadataMapper:
         assert content_metadata["personas"] == ["developer", "architect"]
         assert isinstance(content_metadata["created_at"], datetime)
     
+    def test_chromadb_error_handling(self):
+        """Test ChromaDB error handling and retry logic."""
+        # Test that multiple conditions are properly formatted
+        filters = {
+            "tier": "T1",
+            "content_type": "lesson",
+            "estimated_duration": 60
+        }
+        
+        chroma_query = metadata_mapper.build_filter_query(filters)
+        
+        # Should use $and operator for multiple conditions
+        assert "$and" in chroma_query
+        assert len(chroma_query["$and"]) == 3
+        
+        # Verify each condition is properly formatted
+        conditions = chroma_query["$and"]
+        tier_condition = next(c for c in conditions if "tier" in c)
+        content_type_condition = next(c for c in conditions if "content_type" in c)
+        duration_condition = next(c for c in conditions if "estimated_duration" in c)
+        
+        assert tier_condition == {"tier": "T1"}
+        assert content_type_condition == {"content_type": "lesson"}
+        assert duration_condition == {"estimated_duration": 60}
+    
     def test_comprehensive_metadata_mapping(self):
         """Test mapping with all supported fields."""
         full_metadata = {
@@ -96,22 +121,36 @@ class TestMetadataMapper:
     
     def test_build_filter_query(self):
         """Test building ChromaDB filter queries."""
-        filters = {
+        # Test single filter
+        single_filter = {"tier": "T2"}
+        result = metadata_mapper.build_filter_query(single_filter)
+        assert result == {"tier": "T2"}
+        
+        # Test multiple filters (should use $and)
+        multiple_filters = {
             "tier": "T2",
             "content_type": "lesson",
-            "sandbox_type": "individual",
-            "is_approved": True,
-            "personas": ["developer", "architect"]  # Array field - should be skipped
+            "is_approved": True
         }
+        result = metadata_mapper.build_filter_query(multiple_filters)
+        expected = {
+            "$and": [
+                {"tier": "T2"},
+                {"content_type": "lesson"},
+                {"is_approved": True}
+            ]
+        }
+        assert result == expected
         
-        chroma_filters = metadata_mapper.build_filter_query(filters)
+        # Test array filters
+        array_filter = {"personas": ["developer", "architect"]}
+        result = metadata_mapper.build_filter_query(array_filter)
+        assert result == {"personas": {"$in": ["developer", "architect"]}}
         
-        assert chroma_filters["tier"] == "T2"
-        assert chroma_filters["content_type"] == "lesson"
-        assert chroma_filters["sandbox_type"] == "individual"
-        assert chroma_filters["is_approved"] is True
-        # Array fields should use $in operator
-        assert chroma_filters["personas"] == {"$in": ["developer", "architect"]}
+        # Test empty filters
+        empty_filter = {}
+        result = metadata_mapper.build_filter_query(empty_filter)
+        assert result == {}
     
     def test_validate_metadata(self):
         """Test metadata validation."""

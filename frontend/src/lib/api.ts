@@ -1,59 +1,56 @@
-import { ContentSubmissionRequest, ContentSubmissionResponse, LearningContent } from '@/types/api';
-
+// API client with proper error handling for Docker environment
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001'
-  : 'http://localhost:8001';
+  ? '/api' 
+  : 'http://localhost:8001/api';
 
-class ApiClient {
-  private baseUrl: string;
-
-  constructor(baseUrl: string = API_BASE_URL) {
-    this.baseUrl = baseUrl;
-  }
-
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
+export class ApiClient {
+  private static async makeRequest(endpoint: string, options: RequestInit = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
     
-    const response = await fetch(url, {
+    const defaultOptions: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
       ...options,
-    });
+    };
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API Error: ${response.status} - ${error}`);
+    try {
+      const response = await fetch(url, defaultOptions);
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error - please check your connection');
+      }
+      throw error;
     }
-
-    return response.json();
   }
 
-  // Agent endpoints
-  async submitContent(data: ContentSubmissionRequest): Promise<ContentSubmissionResponse> {
-    return this.request<ContentSubmissionResponse>('/api/v1/agents/process-content', {
+  static async searchContent(params: {
+    query_text?: string;
+    metadata_filters?: Record<string, any>;
+    similarity_threshold?: number;
+    max_results?: number;
+    search_approved_only?: boolean;
+  }) {
+    return this.makeRequest('/v1/vector/search', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        query_text: '',
+        similarity_threshold: 0.1,
+        max_results: 20,
+        search_approved_only: false,
+        ...params,
+      }),
     });
   }
 
-  // Content endpoints
-  async getContent(): Promise<LearningContent[]> {
-    return this.request<LearningContent[]>('/api/v1/content/');
-  }
-
-  async getContentById(id: number): Promise<LearningContent> {
-    return this.request<LearningContent>(`/api/v1/content/${id}`);
-  }
-
-  // Health check
-  async healthCheck(): Promise<{ status: string }> {
-    return this.request<{ status: string }>('/health');
+  static async getContent(contentId: number) {
+    return this.makeRequest(`/v1/content/${contentId}`);
   }
 }
-
-export const apiClient = new ApiClient();
