@@ -6,6 +6,7 @@ import ContentSubmissionForm from './ContentSubmissionForm';
 import WorkflowProgress from './WorkflowProgress';
 import ContentSearch from './ContentSearch';
 import ContentReviewModal from './ContentReviewModal';
+import ContentManagement from './ContentManagement/ContentManagement';
 import { ContentSubmissionResponse } from '@/types/api';
 
 export default function ContentDashboard() {
@@ -141,18 +142,7 @@ export default function ContentDashboard() {
           </TabsContent>
 
           <TabsContent value="manage">
-            <div className="card">
-              <h2 className="text-xl font-semibold mb-4">Content Management</h2>
-              <p className="text-gray-600">
-                Content management features coming soon. This will include:
-              </p>
-              <ul className="list-disc list-inside mt-4 space-y-2 text-gray-600">
-                <li>View all submitted content</li>
-                <li>Filter by status (draft, approved, rejected)</li>
-                <li>Bulk operations</li>
-                <li>Content analytics and insights</li>
-              </ul>
-            </div>
+            <ContentManagement />
           </TabsContent>
         </Tabs>
 
