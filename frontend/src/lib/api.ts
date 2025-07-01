@@ -53,4 +53,14 @@ export class ApiClient {
   static async getContent(contentId: number) {
     return this.makeRequest(`/v1/content/${contentId}`);
   }
+
+  static async submitContent(data: any) {
+    return this.makeRequest('/v1/agents/process-content', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
 }
+
+// Export lowercase instance for compatibility
+export const apiClient = ApiClient;
