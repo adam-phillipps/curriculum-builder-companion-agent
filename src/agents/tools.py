@@ -215,7 +215,7 @@ async def _create_learning_content(
     # Create in database
     db_content = await create_content(db_session, content_data)
     
-    # Add to vector store (draft collection)
+    # Add to vector store (draft collection) with comprehensive metadata
     try:
         vector_id = vector_store.add_content(
             content_id=db_content.id,
@@ -223,7 +223,9 @@ async def _create_learning_content(
             description=metadata.get("description", "Generated learning content"),
             content_text=raw_content,
             metadata=metadata,
-            is_approved=False  # Draft content
+            is_approved=False,  # Draft content
+            created_at=db_content.created_at,
+            updated_at=db_content.updated_at
         )
         print(f"DEBUG: Added content to vector store with ID: {vector_id}")
     except Exception as e:

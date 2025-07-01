@@ -16,6 +16,25 @@ class SimilaritySearchRequest(BaseModel):
     similarity_threshold: float = 0.3
     max_results: int = 10
     search_approved_only: bool = False
+    
+class MetadataFilters(BaseModel):
+    """Enhanced metadata filters for search."""
+    tier: Optional[str] = None
+    content_type: Optional[str] = None
+    sandbox_type: Optional[str] = None
+    author: Optional[str] = None
+    personas: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    aws_services: Optional[List[str]] = None
+    duration_min: Optional[int] = None
+    duration_max: Optional[int] = None
+    cost_min: Optional[float] = None
+    cost_max: Optional[float] = None
+    created_after: Optional[str] = None
+    created_before: Optional[str] = None
+    updated_after: Optional[str] = None
+    updated_before: Optional[str] = None
+    is_approved: Optional[bool] = None
 
 class SimilaritySearchResponse(BaseModel):
     """Response model for similarity search."""
@@ -25,7 +44,7 @@ class SimilaritySearchResponse(BaseModel):
 
 @router.post("/search", response_model=SimilaritySearchResponse)
 async def search_similar_content(request: SimilaritySearchRequest):
-    """Search for similar content using vector similarity."""
+    """Search for similar content using vector similarity with enhanced metadata filtering."""
     try:
         import time
         start_time = time.time()
@@ -48,6 +67,24 @@ async def search_similar_content(request: SimilaritySearchRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+@router.get("/metadata/schema")
+async def get_metadata_schema():
+    """Get the metadata schema for filtering."""
+    from src.vector_store.metadata_mapper import metadata_mapper
+    
+    return {
+        "searchable_fields": metadata_mapper.get_searchable_fields(),
+        "array_fields": metadata_mapper.get_array_fields(),
+        "schema": {
+            field_name: {
+                "type": field_def.type.value,
+                "required": field_def.required,
+                "description": field_def.description
+            }
+            for field_name, field_def in metadata_mapper.METADATA_SCHEMA.items()
+        }
+    }
 
 @router.get("/stats")
 async def get_vector_store_stats():
@@ -80,6 +117,8 @@ async def vector_store_health():
 async def debug_vector_store():
     """Debug endpoint to check vector store contents."""
     try:
+        from src.vector_store.metadata_mapper import metadata_mapper
+        
         stats = vector_store.get_content_stats()
         
         # Try a simple search to test functionality
@@ -93,7 +132,12 @@ async def debug_vector_store():
         return {
             "stats": stats,
             "test_search_results": len(test_results),
-            "sample_results": test_results[:2] if test_results else []
+            "sample_results": test_results[:2] if test_results else [],
+            "metadata_schema": {
+                "total_fields": len(metadata_mapper.METADATA_SCHEMA),
+                "searchable_fields": metadata_mapper.get_searchable_fields(),
+                "array_fields": metadata_mapper.get_array_fields()
+            }
         }
     except Exception as e:
         return {"error": str(e)}
