@@ -174,8 +174,8 @@ async def test_generate_recommendations_missing_prerequisites(sample_gap_analysi
     )
     
     assert missing_prereq_rec is not None
-    assert missing_prereq_rec['priority'] == 'high'
-    assert missing_prereq_rec['impact'] == 'high'
+    assert missing_prereq_rec['priority'] == 'critical'  # High outcome weight (0.8) makes it critical
+    assert missing_prereq_rec['impact'] == 'critical'
     assert len(missing_prereq_rec['actions']) > 0
     assert 'weighted_impact' in missing_prereq_rec
 
@@ -191,8 +191,8 @@ async def test_generate_recommendations_weak_support(sample_gap_analysis):
     )
     
     assert weak_support_rec is not None
-    assert weak_support_rec['priority'] == 'medium'
-    assert weak_support_rec['impact'] == 'medium'
+    assert weak_support_rec['priority'] == 'high'  # Outcome weight (0.6) >= 0.5 makes it high
+    assert weak_support_rec['impact'] == 'high'
     assert 'weighted_impact' in weak_support_rec
 
 @pytest.mark.asyncio

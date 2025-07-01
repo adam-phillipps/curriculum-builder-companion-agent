@@ -34,7 +34,7 @@ class GapAnalyzerAgent:
             
             # Update agent state if provided
             if state:
-                state.analysis_results = {
+                state["analysis_results"] = {
                     "pathway_id": pathway_id,
                     "gaps_found": len(analysis.gaps),
                     "pathway_strength": analysis.pathway_strength,
@@ -51,7 +51,9 @@ class GapAnalyzerAgent:
         except Exception as e:
             error_msg = f"Gap analysis failed for pathway {pathway_id}: {str(e)}"
             if state:
-                state.errors.append(error_msg)
+                if "errors" not in state:
+                    state["errors"] = []
+                state["errors"].append(error_msg)
             
             return {
                 "analysis": None,
@@ -81,7 +83,7 @@ class GapAnalyzerAgent:
             
             # Update agent state if provided
             if state:
-                state.analysis_results = {
+                state["analysis_results"] = {
                     "persona": persona,
                     "objectives": learning_objectives,
                     "gaps_found": len(analysis.gaps),
@@ -99,7 +101,9 @@ class GapAnalyzerAgent:
         except Exception as e:
             error_msg = f"Domain gap analysis failed for {persona}: {str(e)}"
             if state:
-                state.errors.append(error_msg)
+                if "errors" not in state:
+                    state["errors"] = []
+                state["errors"].append(error_msg)
             
             return {
                 "analysis": None,

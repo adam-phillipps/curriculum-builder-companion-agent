@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.dependencies.database import get_db
+from src.api.dependencies import get_db
 from src.services.gap_analysis import gap_analysis_service
 from src.api.schemas.gap_analysis import (
     GapAnalysisSchema,
