@@ -55,7 +55,7 @@ async def test_get_users_endpoint():
         assert isinstance(data, list)
 
 @pytest.mark.asyncio
-async def test_get_user_by_id_endpoint(test_session: AsyncSession):
+async def test_get_user_by_id_endpoint(db_session: AsyncSession):
     """Test getting a user by ID via API."""
     # Create a user first
     user_data = UserCreate(
@@ -63,7 +63,7 @@ async def test_get_user_by_id_endpoint(test_session: AsyncSession):
         last_name="User",
         current_role="learner"
     )
-    user = await create_user(test_session, user_data)
+    user = await create_user(db_session, user_data)
     
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.get(f"/users/{user.id}")
@@ -83,14 +83,14 @@ async def test_get_user_not_found():
         assert "User not found" in response.json()["detail"]
 
 @pytest.mark.asyncio
-async def test_update_user_endpoint(test_session: AsyncSession):
+async def test_update_user_endpoint(db_session: AsyncSession):
     """Test updating a user via API."""
     # Create a user first
     user_data = UserCreate(
         first_name="Original",
         current_role="learner"
     )
-    user = await create_user(test_session, user_data)
+    user = await create_user(db_session, user_data)
     
     async with AsyncClient(app=app, base_url="http://test") as client:
         update_data = {
@@ -108,14 +108,14 @@ async def test_update_user_endpoint(test_session: AsyncSession):
         assert data["current_role"] == "developer"
 
 @pytest.mark.asyncio
-async def test_sign_in_user_endpoint(test_session: AsyncSession):
+async def test_sign_in_user_endpoint(db_session: AsyncSession):
     """Test user sign-in via API."""
     # Create a learner user first
     user_data = UserCreate(
         first_name="Learner",
         current_role="learner"
     )
-    user = await create_user(test_session, user_data)
+    user = await create_user(db_session, user_data)
     
     async with AsyncClient(app=app, base_url="http://test") as client:
         sign_in_data = {"user_id": user.id}
@@ -154,14 +154,14 @@ async def test_get_available_roles():
         assert "developer" in roles
 
 @pytest.mark.asyncio
-async def test_get_learner_profile_endpoint(test_session: AsyncSession):
+async def test_get_learner_profile_endpoint(db_session: AsyncSession):
     """Test getting learner profile via API."""
     # Create a learner user
     user_data = UserCreate(
         first_name="Student",
         current_role="learner"
     )
-    user = await create_user(test_session, user_data)
+    user = await create_user(db_session, user_data)
     
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.get(f"/users/{user.id}/learner-profile")
@@ -172,14 +172,14 @@ async def test_get_learner_profile_endpoint(test_session: AsyncSession):
         assert data["total_content_completed"] == 0
 
 @pytest.mark.asyncio
-async def test_get_user_content_progress_endpoint(test_session: AsyncSession):
+async def test_get_user_content_progress_endpoint(db_session: AsyncSession):
     """Test getting user content progress via API."""
     # Create a user
     user_data = UserCreate(
         first_name="Progress",
         current_role="learner"
     )
-    user = await create_user(test_session, user_data)
+    user = await create_user(db_session, user_data)
     
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.get(f"/users/{user.id}/content-progress")
