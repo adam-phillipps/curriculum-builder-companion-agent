@@ -7,7 +7,9 @@ from chromadb.config import Settings
 from typing import List, Dict, Any, Optional, Tuple
 import hashlib
 import json
+from datetime import datetime
 from src.config import get_settings
+from src.vector_store.metadata_mapper import metadata_mapper
 
 settings = get_settings()
 
@@ -87,9 +89,11 @@ class VectorStoreService:
         description: str,
         content_text: str,
         metadata: Dict[str, Any],
-        is_approved: bool = False
+        is_approved: bool = False,
+        created_at: Optional[datetime] = None,
+        updated_at: Optional[datetime] = None
     ) -> str:
-        """Add content to vector store."""
+        """Add content to vector store with comprehensive metadata."""
         
         # Generate content hash and vector ID
         content_hash = self._hash_content(content_text)
@@ -98,21 +102,20 @@ class VectorStoreService:
         # Prepare document for embedding
         document = f"Title: {title}\nDescription: {description}\nContent: {content_text}"
         
-        # Enhanced metadata with searchable fields
-        vector_metadata = {
+        # Prepare comprehensive metadata using mapper
+        full_metadata = {
             "content_id": content_id,
             "title": title,
             "description": description,
-            "tier": metadata.get("tier", ""),
-            "content_type": metadata.get("content_type", ""),
-            "personas": json.dumps(metadata.get("personas", [])),
-            "aws_services": json.dumps(metadata.get("aws_services", [])),
-            "estimated_duration": metadata.get("estimated_duration", 0),
-            "estimated_cost": metadata.get("estimated_cost", 0.0),
-            "sandbox_type": metadata.get("sandbox_type", ""),
             "content_hash": content_hash,
-            "is_approved": is_approved
+            "is_approved": is_approved,
+            "created_at": created_at or datetime.now(),
+            "updated_at": updated_at or datetime.now(),
+            **metadata  # Include all provided metadata
         }
+        
+        # Convert to ChromaDB-compatible format
+        vector_metadata = metadata_mapper.to_chroma_metadata(full_metadata)
         
         # Choose collection based on approval status
         collection = self.approved_collection if is_approved else self.draft_collection
@@ -156,13 +159,10 @@ class VectorStoreService:
         else:
             collections_to_search = [self.approved_collection, self.draft_collection]
         
-        # Build ChromaDB where clause from filters (simplified for compatibility)
+        # Build ChromaDB where clause using metadata mapper
         where_clause = {}
         if metadata_filters:
-            for key, value in metadata_filters.items():
-                if key in ["tier", "content_type", "sandbox_type"] and value:
-                    where_clause[key] = value
-                # Skip complex range queries that cause ChromaDB issues
+            where_clause = metadata_mapper.build_filter_query(metadata_filters)
         
         try:
             # Search across all specified collections
@@ -191,18 +191,10 @@ class VectorStoreService:
                             
                             # Filter by similarity threshold
                             if similarity_score >= similarity_threshold:
-                                all_similar_items.append({
-                                    "content_id": metadata["content_id"],
-                                    "title": metadata["title"],
-                                    "description": metadata["description"],
-                                    "tier": metadata["tier"],
-                                    "content_type": metadata["content_type"],
-                                    "similarity_score": round(similarity_score, 3),
-                                    "personas": json.loads(metadata.get("personas", "[]")),
-                                    "aws_services": json.loads(metadata.get("aws_services", "[]")),
-                                    "estimated_duration": metadata["estimated_duration"],
-                                    "estimated_cost": metadata["estimated_cost"]
-                                })
+                                # Convert ChromaDB metadata back to our format
+                                content_metadata = metadata_mapper.from_chroma_metadata(metadata)
+                                content_metadata["similarity_score"] = round(similarity_score, 3)
+                                all_similar_items.append(content_metadata)
                 except Exception as e:
                     print(f"Error querying collection: {e}")
                     import traceback

@@ -10,10 +10,22 @@ interface SearchResult {
   tier: string;
   content_type: string;
   similarity_score: number;
-  personas: string[];
-  aws_services: string[];
+  personas?: string[];
+  aws_services?: string[];
   estimated_duration: number;
   estimated_cost: number;
+  sandbox_type?: string;
+  author?: string;
+  co_authors?: string[];
+  sources?: string;
+  artifacts?: string;
+  ai_assisted?: string;
+  tags?: string[];
+  learning_objectives?: string[];
+  created_at?: string;
+  updated_at?: string;
+  status?: string;
+  is_approved?: boolean;
 }
 
 interface SearchResponse {
@@ -34,6 +46,18 @@ export default function ContentSearch({ onContentSelect }: Props) {
   const [filters, setFilters] = useState({
     tier: '',
     content_type: '',
+    sandbox_type: '',
+    author: '',
+    personas: [] as string[],
+    tags: [] as string[],
+    duration_min: '',
+    duration_max: '',
+    cost_min: '',
+    cost_max: '',
+    created_after: '',
+    created_before: '',
+    updated_after: '',
+    updated_before: '',
     search_approved_only: false,
     similarity_threshold: 0.3
   });
@@ -51,7 +75,19 @@ export default function ContentSearch({ onContentSelect }: Props) {
           query_text: query,
           metadata_filters: {
             ...(filters.tier && { tier: filters.tier }),
-            ...(filters.content_type && { content_type: filters.content_type })
+            ...(filters.content_type && { content_type: filters.content_type }),
+            ...(filters.sandbox_type && { sandbox_type: filters.sandbox_type }),
+            ...(filters.author && { author: filters.author }),
+            ...(filters.personas.length > 0 && { personas: filters.personas }),
+            ...(filters.tags.length > 0 && { tags: filters.tags }),
+            ...(filters.duration_min && { duration_min: parseInt(filters.duration_min) }),
+            ...(filters.duration_max && { duration_max: parseInt(filters.duration_max) }),
+            ...(filters.cost_min && { cost_min: parseFloat(filters.cost_min) }),
+            ...(filters.cost_max && { cost_max: parseFloat(filters.cost_max) }),
+            ...(filters.created_after && { created_after: filters.created_after }),
+            ...(filters.created_before && { created_before: filters.created_before }),
+            ...(filters.updated_after && { updated_after: filters.updated_after }),
+            ...(filters.updated_before && { updated_before: filters.updated_before })
           },
           similarity_threshold: filters.similarity_threshold,
           max_results: 20,
@@ -132,9 +168,10 @@ export default function ContentSearch({ onContentSelect }: Props) {
       {/* Filters */}
       {showFilters && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          {/* Basic Filters */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tier</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty Tier</label>
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 value={filters.tier}
@@ -160,37 +197,202 @@ export default function ContentSearch({ onContentSelect }: Props) {
                 <option value="module">Module</option>
                 <option value="exercise">Exercise</option>
                 <option value="assessment">Assessment</option>
+                <option value="session">Session</option>
+                <option value="experiment">Experiment</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sandbox Requirements</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                value={filters.sandbox_type}
+                onChange={(e) => setFilters({...filters, sandbox_type: e.target.value})}
+              >
+                <option value="">Any Sandbox</option>
+                <option value="individual">Individual</option>
+                <option value="shared">Shared</option>
+                <option value="isolated">Isolated</option>
+                <option value="managed">Managed</option>
               </select>
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center">
+          {/* Author and Role Filters */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Author</label>
               <input
-                type="checkbox"
-                id="approved-only"
-                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                checked={filters.search_approved_only}
-                onChange={(e) => setFilters({...filters, search_approved_only: e.target.checked})}
+                type="text"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Search by author name"
+                value={filters.author}
+                onChange={(e) => setFilters({...filters, author: e.target.value})}
               />
-              <label htmlFor="approved-only" className="ml-2 text-sm text-gray-700">
-                Approved content only
-              </label>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <label className="text-sm text-gray-700">Similarity threshold:</label>
-              <input
-                type="range"
-                min="0.1"
-                max="1"
-                step="0.1"
-                value={filters.similarity_threshold}
-                onChange={(e) => setFilters({...filters, similarity_threshold: parseFloat(e.target.value)})}
-                className="w-20"
-              />
-              <span className="text-sm text-gray-600">{Math.round(filters.similarity_threshold * 100)}%</span>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Target Roles</label>
+              <select
+                multiple
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                value={filters.personas}
+                onChange={(e) => setFilters({...filters, personas: Array.from(e.target.selectedOptions, option => option.value)})}
+              >
+                <option value="developer">Developer</option>
+                <option value="architect">Solution Architect</option>
+                <option value="operations">Operations Engineer</option>
+                <option value="security">Security Engineer</option>
+                <option value="data_engineer">Data Engineer</option>
+                <option value="ml_engineer">ML Engineer</option>
+                <option value="all_roles">All Roles</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
             </div>
+          </div>
+
+          {/* Tags Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="e.g., lambda, serverless, python (comma-separated)"
+              value={filters.tags.join(', ')}
+              onChange={(e) => setFilters({...filters, tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)})}
+            />
+          </div>
+
+          {/* Duration and Cost Ranges */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
+              <div className="flex space-x-2">
+                <input
+                  type="number"
+                  placeholder="Min"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  value={filters.duration_min}
+                  onChange={(e) => setFilters({...filters, duration_min: e.target.value})}
+                />
+                <span className="self-center text-gray-500">to</span>
+                <input
+                  type="number"
+                  placeholder="Max"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  value={filters.duration_max}
+                  onChange={(e) => setFilters({...filters, duration_max: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cost Estimate ($)</label>
+              <div className="flex space-x-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Min"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  value={filters.cost_min}
+                  onChange={(e) => setFilters({...filters, cost_min: e.target.value})}
+                />
+                <span className="self-center text-gray-500">to</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Max"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  value={filters.cost_max}
+                  onChange={(e) => setFilters({...filters, cost_max: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Date Filters */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Created Date</label>
+              <div className="flex space-x-2">
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  value={filters.created_after}
+                  onChange={(e) => setFilters({...filters, created_after: e.target.value})}
+                />
+                <span className="self-center text-gray-500">to</span>
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  value={filters.created_before}
+                  onChange={(e) => setFilters({...filters, created_before: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Updated</label>
+              <div className="flex space-x-2">
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  value={filters.updated_after}
+                  onChange={(e) => setFilters({...filters, updated_after: e.target.value})}
+                />
+                <span className="self-center text-gray-500">to</span>
+                <input
+                  type="date"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  value={filters.updated_before}
+                  onChange={(e) => setFilters({...filters, updated_before: e.target.value})}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Options */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="approved-only"
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  checked={filters.search_approved_only}
+                  onChange={(e) => setFilters({...filters, search_approved_only: e.target.checked})}
+                />
+                <label htmlFor="approved-only" className="ml-2 text-sm text-gray-700">
+                  Approved content only
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <label className="text-sm text-gray-700">Similarity:</label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1"
+                  step="0.1"
+                  value={filters.similarity_threshold}
+                  onChange={(e) => setFilters({...filters, similarity_threshold: parseFloat(e.target.value)})}
+                  className="w-20"
+                />
+                <span className="text-sm text-gray-600">{Math.round(filters.similarity_threshold * 100)}%</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setFilters({
+                tier: '', content_type: '', sandbox_type: '', author: '', personas: [], tags: [],
+                duration_min: '', duration_max: '', cost_min: '', cost_max: '',
+                created_after: '', created_before: '', updated_after: '', updated_before: '',
+                search_approved_only: false, similarity_threshold: 0.3
+              })}
+              className="text-sm text-gray-600 hover:text-gray-800 underline"
+            >
+              Clear All Filters
+            </button>
           </div>
         </div>
       )}
@@ -223,25 +425,49 @@ export default function ContentSearch({ onContentSelect }: Props) {
 
             <p className="text-gray-600 text-sm mb-3 overflow-hidden" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'}}>{result.description}</p>
 
-            <div className="flex items-center space-x-4 text-xs text-gray-500">
-              <div className="flex items-center">
-                <Tag className="w-3 h-3 mr-1" />
-                {result.content_type}
-              </div>
-              <div className="flex items-center">
-                <Clock className="w-3 h-3 mr-1" />
-                {result.estimated_duration}min
-              </div>
-              <div className="flex items-center">
-                <User className="w-3 h-3 mr-1" />
-                {result.personas.join(', ')}
-              </div>
-              {result.aws_services.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center space-x-4 text-xs text-gray-500">
                 <div className="flex items-center">
-                  <Zap className="w-3 h-3 mr-1" />
-                  {result.aws_services.join(', ')}
+                  <Tag className="w-3 h-3 mr-1" />
+                  {result.content_type}
                 </div>
-              )}
+                <div className="flex items-center">
+                  <Clock className="w-3 h-3 mr-1" />
+                  {result.estimated_duration}min
+                </div>
+                <div className="flex items-center">
+                  <User className="w-3 h-3 mr-1" />
+                  {result.personas?.join(', ') || 'N/A'}
+                </div>
+                {result.estimated_cost > 0 && (
+                  <div className="flex items-center">
+                    <span className="w-3 h-3 mr-1">$</span>
+                    {result.estimated_cost}
+                  </div>
+                )}
+                {result.aws_services?.length > 0 && (
+                  <div className="flex items-center">
+                    <Zap className="w-3 h-3 mr-1" />
+                    {result.aws_services.join(', ')}
+                  </div>
+                )}
+              </div>
+              
+              {/* Additional metadata row */}
+              <div className="flex items-center space-x-4 text-xs text-gray-400">
+                {result.author && (
+                  <div>Author: {result.author}</div>
+                )}
+                {result.sandbox_type && (
+                  <div>Sandbox: {result.sandbox_type}</div>
+                )}
+                {result.tags?.length > 0 && (
+                  <div>Tags: {result.tags.join(', ')}</div>
+                )}
+                {result.created_at && (
+                  <div>Created: {new Date(result.created_at).toLocaleDateString()}</div>
+                )}
+              </div>
             </div>
           </div>
         ))}
