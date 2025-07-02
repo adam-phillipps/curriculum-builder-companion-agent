@@ -3,7 +3,7 @@ User models for the curriculum builder system.
 """
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, JSON, Float
 from sqlalchemy.orm import relationship
 from src.db.database import Base
 
@@ -24,6 +24,7 @@ class User(Base):
     # Relationships
     learner_profiles = relationship("LearnerProfile", back_populates="user")
     content_progress = relationship("UserContentProgress", back_populates="user")
+    skill_assessments = relationship("UserSkillAssessment", back_populates="user")
 
 class LearnerProfile(Base):
     """Learner-specific profile data and progress tracking."""
@@ -78,3 +79,16 @@ class UserContentProgress(Base):
     # Relationships
     user = relationship("User", back_populates="content_progress")
     content = relationship("LearningContent")
+
+class UserSkillAssessment(Base):
+    """Track user skill proficiency levels for pathway recommendations."""
+    __tablename__ = "user_skill_assessments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    skill_category = Column(String(100), nullable=False)
+    proficiency_level = Column(Float, nullable=False)  # 0.0 to 1.0
+    assessment_date = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="skill_assessments")

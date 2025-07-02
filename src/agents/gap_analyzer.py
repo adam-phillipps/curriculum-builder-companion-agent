@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.services.gap_analysis import gap_analysis_service, GapAnalysis
 from src.agents.state import AgentState
 from src.config import get_settings
+from src.utils.chain_rule import calculate_learning_impact
 
 settings = get_settings()
 

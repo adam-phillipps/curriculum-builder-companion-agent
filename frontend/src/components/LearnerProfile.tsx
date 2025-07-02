@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import InteractivePathwayGraph from './InteractivePathwayGraph';
 
 interface LearnerProfile {
   id: number;
@@ -27,6 +28,7 @@ export default function LearnerProfile({ userId }: LearnerProfileProps) {
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
   const [progress, setProgress] = useState<ContentProgress[]>([]);
   const [loading, setLoading] = useState(true);
+
 
   useEffect(() => {
     loadProfileData();
@@ -140,35 +142,11 @@ export default function LearnerProfile({ userId }: LearnerProfileProps) {
         </div>
       )}
 
-      {/* Simple Sankey-style Flow Visualization */}
-      <div className="bg-white border rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Learning Flow</h2>
-        <div className="flex items-center justify-between">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-2">
-              <span className="text-blue-600 font-bold">{progress.length}</span>
-            </div>
-            <div className="text-sm text-gray-600">Total Content</div>
-          </div>
-          <div className="flex-1 mx-4">
-            <div className="relative">
-              <div className="h-2 bg-gray-200 rounded">
-                <div 
-                  className="h-2 bg-gradient-to-r from-blue-400 to-green-400 rounded transition-all duration-500"
-                  style={{ width: `${(completedContent / progress.length) * 100}%` }}
-                />
-              </div>
-              <div className="text-xs text-center mt-1 text-gray-500">Learning Journey</div>
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-2">
-              <span className="text-green-600 font-bold">{completedContent}</span>
-            </div>
-            <div className="text-sm text-gray-600">Completed</div>
-          </div>
-        </div>
-      </div>
+      {/* Interactive Pathway Graph with Chain Rule */}
+      <InteractivePathwayGraph 
+        userId={userId} 
+        pathwayId={2}
+      />
     </div>
   );
 }

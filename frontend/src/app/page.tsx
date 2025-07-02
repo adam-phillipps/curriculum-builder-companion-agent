@@ -4,6 +4,8 @@ import { useState } from 'react';
 import ContentDashboard from '@/components/ContentDashboard';
 import LearnerProfile from '@/components/LearnerProfile';
 import UserSignInModal from '@/components/UserSignInModal';
+import CreateAccountModal from '@/components/CreateAccountModal';
+import RoleSwitcher from '@/components/RoleSwitcher';
 
 interface User {
   id: number;
@@ -16,10 +18,19 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
 
   const handleSignIn = (user: User) => {
     setCurrentUser(user);
-    // Set default tab based on role
+    if (user.current_role === 'learner') {
+      setActiveTab('profile');
+    } else {
+      setActiveTab('dashboard');
+    }
+  };
+
+  const handleAccountCreated = (user: User) => {
+    setCurrentUser(user);
     if (user.current_role === 'learner') {
       setActiveTab('profile');
     } else {
@@ -30,6 +41,20 @@ export default function HomePage() {
   const handleSignOut = () => {
     setCurrentUser(null);
     setActiveTab('dashboard');
+  };
+
+  const handleRoleChange = (newRole: string) => {
+    if (currentUser) {
+      const updatedUser = { ...currentUser, current_role: newRole };
+      setCurrentUser(updatedUser);
+      
+      // Set appropriate default tab for role
+      if (newRole === 'learner') {
+        setActiveTab('profile');
+      } else {
+        setActiveTab('dashboard');
+      }
+    }
   };
 
   const getRoleBasedTabs = () => {
@@ -53,11 +78,11 @@ export default function HomePage() {
       case 'profile':
         return currentUser ? <LearnerProfile userId={currentUser.id} /> : null;
       case 'dashboard':
-        return <ContentDashboard />;
+        return <ContentDashboard userRole={currentUser?.current_role} />;
       case 'builder':
         return <div className="p-6">Content Builder (Coming Soon)</div>;
       default:
-        return <ContentDashboard />;
+        return <ContentDashboard userRole={currentUser?.current_role} />;
     }
   };
 
@@ -73,62 +98,88 @@ export default function HomePage() {
               </h1>
               {currentUser && (
                 <span className="text-sm text-gray-600">
-                  Welcome, {currentUser.first_name} ({currentUser.current_role})
+                  Welcome, {currentUser.first_name}
                 </span>
               )}
             </div>
             <div className="flex items-center space-x-4">
               {currentUser ? (
-                <button
-                  onClick={handleSignOut}
-                  className="text-sm text-gray-600 hover:text-gray-900"
-                >
-                  Sign Out
-                </button>
+                <>
+                  <RoleSwitcher 
+                    currentUser={currentUser} 
+                    onRoleChange={handleRoleChange} 
+                  />
+                  <button
+                    onClick={handleSignOut}
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    Sign Out
+                  </button>
+                </>
               ) : (
-                <button
-                  onClick={() => setShowSignInModal(true)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700"
-                >
-                  Sign In
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowCreateAccountModal(true)}
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    Create Account
+                  </button>
+                  <button
+                    onClick={() => setShowSignInModal(true)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700"
+                  >
+                    Sign In
+                  </button>
+                </>
               )}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Navigation Tabs */}
-      <nav className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
-            {getRoleBasedTabs().map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+      {/* Navigation Tabs - Only show if user is signed in */}
+      {currentUser && (
+        <nav className="bg-white border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex space-x-8">
+              {getRoleBasedTabs().map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </nav>
+        </nav>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto">
         {renderActiveTab()}
       </main>
 
-      {/* Sign In Modal */}
+      {/* Modals */}
       <UserSignInModal
         isOpen={showSignInModal}
         onClose={() => setShowSignInModal(false)}
         onSignIn={handleSignIn}
+        onCreateAccount={() => {
+          setShowSignInModal(false);
+          setShowCreateAccountModal(true);
+        }}
+      />
+
+      <CreateAccountModal
+        isOpen={showCreateAccountModal}
+        onClose={() => setShowCreateAccountModal(false)}
+        onAccountCreated={handleAccountCreated}
       />
     </div>
   );

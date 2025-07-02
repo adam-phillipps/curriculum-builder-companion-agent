@@ -1,7 +1,7 @@
 // API client with proper error handling for Docker environment
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
   ? '/api' 
-  : 'http://localhost:8001/api';
+  : 'http://localhost:8001';
 
 export class ApiClient {
   static async makeRequest(endpoint: string, options: RequestInit = {}) {
