@@ -16,14 +16,20 @@ export class ApiClient {
     };
 
     try {
+      console.log('API Request:', url, defaultOptions);
       const response = await fetch(url, defaultOptions);
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, response.statusText, errorText);
         throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      console.log('API Response:', data);
+      return data;
     } catch (error) {
+      console.error('API Request failed:', error);
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error('Network error - please check your connection');
       }
@@ -52,6 +58,20 @@ export class ApiClient {
 
   static async getContent(contentId: number) {
     return this.makeRequest(`/v1/content/${contentId}`);
+  }
+
+  static async getContentList(params: {
+    limit?: number;
+    offset?: number;
+  } = {}) {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.offset) queryParams.append('offset', params.offset.toString());
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/v1/content?${queryString}` : '/v1/content';
+    
+    return this.makeRequest(endpoint);
   }
 
   static async submitContent(data: any) {

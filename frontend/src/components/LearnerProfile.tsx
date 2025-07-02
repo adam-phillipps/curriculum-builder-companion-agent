@@ -143,10 +143,12 @@ export default function LearnerProfile({ userId }: LearnerProfileProps) {
       )}
 
       {/* Interactive Pathway Graph with Chain Rule */}
-      <InteractivePathwayGraph 
-        userId={userId} 
-        pathwayId={2}
-      />
+      {profile.current_pathway_id && (
+        <InteractivePathwayGraph 
+          userId={userId} 
+          pathwayId={profile.current_pathway_id}
+        />
+      )}
     </div>
   );
 }

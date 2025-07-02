@@ -23,18 +23,63 @@ interface FullContent {
   full_content?: string;
 }
 
+/**
+ * Full-screen content viewer component for displaying learning content details.
+ * 
+ * Fetches and displays complete learning content including objectives,
+ * descriptions, target audience, and technical requirements.
+ * 
+ * Parameters
+ * ----------
+ * contentId : number
+ *     The unique identifier of the content to display
+ * onClose : () => void
+ *     Callback function to close the content viewer
+ * 
+ * Returns
+ * -------
+ * JSX.Element
+ *     Full-screen modal with content details or loading/error states
+ */
 export default function ContentViewer({ contentId, onClose }: ContentViewerProps) {
   const [content, setContent] = useState<FullContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    /**
+     * Fetch content details for the specified content ID.
+     * 
+     * Retrieves all content from the API and finds the specific item
+     * by ID since individual content endpoints may not be available.
+     * 
+     * Parameters
+     * ----------
+     * contentId : number
+     *     The ID of the content item to fetch
+     * 
+     * Side Effects
+     * ------------
+     * - Sets loading state during fetch
+     * - Updates content state with fetched data
+     * - Sets error state if fetch fails
+     */
     const fetchContent = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        const data = await ApiClient.getContent(contentId);
+        // First get all content, then find the specific item
+        const response = await fetch('http://localhost:8001/api/v1/content');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const allContent = await response.json();
+        const data = allContent.find((item: any) => item.id === contentId);
+        
+        if (!data) {
+          throw new Error(`Content with ID ${contentId} not found`);
+        }
         setContent(data);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load content';

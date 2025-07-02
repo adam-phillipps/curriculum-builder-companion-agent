@@ -56,7 +56,7 @@ async def test_create_user_invalid_role():
         response = await client.post("/users/", json=user_data)
         
         assert response.status_code == 400
-        assert "Invalid role" in response.json()["detail"]
+        assert "Invalid profile role" in response.json()["detail"]
 
 @pytest.mark.asyncio
 async def test_get_users_endpoint():
@@ -125,7 +125,7 @@ async def test_update_user_endpoint(db_session: AsyncSession):
             update_data = {
                 "first_name": "Updated",
                 "last_name": "Name",
-                "current_role": "developer"
+                "current_role": "builder"
             }
             
             response = await client.put(f"/users/{user.id}", json=update_data)
@@ -134,7 +134,7 @@ async def test_update_user_endpoint(db_session: AsyncSession):
             data = response.json()
             assert data["first_name"] == "Updated"
             assert data["last_name"] == "Name"
-            assert data["current_role"] == "developer"
+            assert data["current_role"] == "builder"
     finally:
         app.dependency_overrides.clear()
 
@@ -190,7 +190,9 @@ async def test_get_available_roles():
         assert "learner" in roles
         assert "builder" in roles
         assert "curriculum_architect" in roles
-        assert "developer" in roles
+        # Should not contain career roles, only profile roles
+        assert "admin" in roles
+        assert "developer" not in roles  # This is a career role, not profile role
 
 @pytest.mark.asyncio
 async def test_get_learner_profile_endpoint(db_session: AsyncSession):

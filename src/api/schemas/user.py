@@ -10,7 +10,8 @@ class UserCreate(BaseModel):
     first_name: Optional[str] = Field(None, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
     email: Optional[str] = None
-    current_role: str = Field("learner", description="User's current role")
+    current_role: str = Field("learner", description="User's profile role")
+    career_role: Optional[str] = Field(None, description="User's career/job role")
 
 class UserResponse(BaseModel):
     """Schema for user data responses."""
@@ -19,6 +20,7 @@ class UserResponse(BaseModel):
     last_name: Optional[str]
     email: Optional[str]
     current_role: str
+    career_role: Optional[str]
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -31,6 +33,7 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = Field(None, max_length=100)
     email: Optional[str] = None
     current_role: Optional[str] = None
+    career_role: Optional[str] = None
 
 class LearnerProfileCreate(BaseModel):
     """Schema for creating a learner profile."""

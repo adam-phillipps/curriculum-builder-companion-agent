@@ -41,12 +41,15 @@ export default function CreateAccountModal({ isOpen, onClose, onAccountCreated }
     setLoading(true);
     
     try {
+      console.log('Creating account with data:', formData);
       const response = await api.post('/users/', formData);
+      console.log('Account created:', response.data);
       onAccountCreated(response.data);
       onClose();
       setFormData({ first_name: '', last_name: '', email: '', current_role: 'learner' });
     } catch (error) {
       console.error('Failed to create account:', error);
+      alert('Failed to create account: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }

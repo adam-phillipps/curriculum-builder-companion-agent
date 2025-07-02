@@ -24,12 +24,12 @@ async def create_new_user(
     db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
     """Create a new user account."""
-    # Validate role
-    valid_roles = BuilderConstants.PERSONAS.get_names() + ["learner", "builder", "curriculum_architect"]
+    # Validate profile role
+    valid_roles = BuilderConstants.APPLICATION_ROLES.get_names()
     if user_data.current_role not in valid_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid role. Must be one of: {valid_roles}"
+            detail=f"Invalid profile role. Must be one of: {valid_roles}"
         )
     
     try:
@@ -72,13 +72,13 @@ async def update_user_by_id(
     db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
     """Update user data."""
-    # Validate role if provided
+    # Validate profile role if provided
     if user_data.current_role:
-        valid_roles = BuilderConstants.PERSONAS.get_names() + ["learner", "builder", "curriculum_architect"]
+        valid_roles = BuilderConstants.APPLICATION_ROLES.get_names()
         if user_data.current_role not in valid_roles:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid role. Must be one of: {valid_roles}"
+                detail=f"Invalid profile role. Must be one of: {valid_roles}"
             )
     
     user = await update_user(db, user_id, user_data)
@@ -136,5 +136,10 @@ async def get_user_progress(
 
 @router.get("/roles/available", response_model=List[str])
 async def get_available_roles() -> List[str]:
-    """Get list of available user roles."""
-    return BuilderConstants.PERSONAS.get_names() + ["learner", "builder", "curriculum_architect"]
+    """Get list of available profile roles."""
+    return BuilderConstants.APPLICATION_ROLES.get_names()
+
+@router.get("/career-roles/available", response_model=List[str])
+async def get_available_career_roles() -> List[str]:
+    """Get list of available career/job roles."""
+    return BuilderConstants.PERSONAS.get_names()

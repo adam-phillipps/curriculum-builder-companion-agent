@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import ContentDashboard from '@/components/ContentDashboard';
+import ContentManagement from '@/components/ContentManagement/ContentManagement';
 import LearnerProfile from '@/components/LearnerProfile';
 import UserSignInModal from '@/components/UserSignInModal';
 import CreateAccountModal from '@/components/CreateAccountModal';
@@ -22,19 +23,41 @@ export default function HomePage() {
 
   const handleSignIn = (user: User) => {
     setCurrentUser(user);
-    if (user.current_role === 'learner') {
-      setActiveTab('profile');
-    } else {
-      setActiveTab('dashboard');
+    switch (user.current_role) {
+      case 'learner':
+        setActiveTab('profile');
+        break;
+      case 'builder':
+        setActiveTab('catalog');
+        break;
+      case 'curriculum_architect':
+        setActiveTab('catalog');
+        break;
+      case 'admin':
+        setActiveTab('catalog');
+        break;
+      default:
+        setActiveTab('catalog');
     }
   };
 
   const handleAccountCreated = (user: User) => {
     setCurrentUser(user);
-    if (user.current_role === 'learner') {
-      setActiveTab('profile');
-    } else {
-      setActiveTab('dashboard');
+    switch (user.current_role) {
+      case 'learner':
+        setActiveTab('profile');
+        break;
+      case 'builder':
+        setActiveTab('catalog');
+        break;
+      case 'curriculum_architect':
+        setActiveTab('catalog');
+        break;
+      case 'admin':
+        setActiveTab('catalog');
+        break;
+      default:
+        setActiveTab('catalog');
     }
   };
 
@@ -49,40 +72,107 @@ export default function HomePage() {
       setCurrentUser(updatedUser);
       
       // Set appropriate default tab for role
-      if (newRole === 'learner') {
-        setActiveTab('profile');
-      } else {
-        setActiveTab('dashboard');
+      switch (newRole) {
+        case 'learner':
+          setActiveTab('profile');
+          break;
+        case 'builder':
+          setActiveTab('builder-profile');
+          break;
+        case 'curriculum_architect':
+          setActiveTab('architect-profile');
+          break;
+        case 'admin':
+          setActiveTab('profile');
+          break;
+        default:
+          setActiveTab('catalog');
       }
     }
   };
 
   const getRoleBasedTabs = () => {
-    if (!currentUser) return [{ id: 'dashboard', label: 'Content Dashboard' }];
+    if (!currentUser) return [];
     
-    const baseTabs = [{ id: 'dashboard', label: 'Content Dashboard' }];
+    const { current_role } = currentUser;
     
-    if (currentUser.current_role === 'learner') {
-      baseTabs.unshift({ id: 'profile', label: 'My Learning Profile' });
+    switch (current_role) {
+      case 'learner':
+        return [
+          { id: 'profile', label: 'My Learning Profile' },
+          { id: 'similarity-search', label: 'Similarity Search' },
+          { id: 'catalog', label: 'Content Catalog' }
+        ];
+      
+      case 'builder':
+        return [
+          { id: 'builder-profile', label: 'Builder Profile' },
+          { id: 'similarity-search', label: 'Similarity Search' },
+          { id: 'catalog', label: 'Content Catalog' }
+        ];
+      
+      case 'curriculum_architect':
+        return [
+          { id: 'architect-profile', label: 'Architect Profile' },
+          { id: 'similarity-search', label: 'Similarity Search' },
+          { id: 'catalog', label: 'Content Catalog' }
+        ];
+      
+      case 'admin':
+        return [
+          { id: 'profile', label: 'Admin Profile' },
+          { id: 'similarity-search', label: 'Similarity Search' },
+          { id: 'catalog', label: 'Content Catalog' },
+          { id: 'admin', label: 'Administration' }
+        ];
+      
+      default:
+        return [{ id: 'catalog', label: 'Content Catalog' }];
     }
-    
-    if (currentUser.current_role === 'builder' || currentUser.current_role === 'curriculum_architect') {
-      baseTabs.push({ id: 'builder', label: 'Content Builder' });
-    }
-    
-    return baseTabs;
   };
 
   const renderActiveTab = () => {
+    if (!currentUser) return null;
+    
     switch (activeTab) {
       case 'profile':
-        return currentUser ? <LearnerProfile userId={currentUser.id} /> : null;
-      case 'dashboard':
-        return <ContentDashboard userRole={currentUser?.current_role} />;
-      case 'builder':
-        return <div className="p-6">Content Builder (Coming Soon)</div>;
+        return <LearnerProfile userId={currentUser.id} />;
+      case 'builder-profile':
+        return <div className="p-6 text-center text-gray-600">Builder Profile - Coming Soon</div>;
+      case 'architect-profile':
+        return <div className="p-6 text-center text-gray-600">Curriculum Architect Profile - Coming Soon</div>;
+      case 'similarity-search':
+        return <div className="p-6 text-center text-gray-600">Similarity Search - Coming Soon</div>;
+      case 'catalog':
+        return (
+          <div className="container mx-auto px-4 py-8">
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Content Catalog
+              </h1>
+              <p className="text-gray-600">
+                Browse and manage learning content items
+              </p>
+            </div>
+            <ContentManagement />
+          </div>
+        );
+      case 'admin':
+        return <div className="p-6 text-center text-gray-600">Administration - Coming Soon</div>;
       default:
-        return <ContentDashboard userRole={currentUser?.current_role} />;
+        return (
+          <div className="container mx-auto px-4 py-8">
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Content Catalog
+              </h1>
+              <p className="text-gray-600">
+                Browse and manage learning content items
+              </p>
+            </div>
+            <ContentManagement />
+          </div>
+        );
     }
   };
 

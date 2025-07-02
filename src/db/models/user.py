@@ -16,6 +16,7 @@ class User(Base):
     last_name = Column(String(100), nullable=True)
     email = Column(String(255), unique=True, index=True, nullable=True)
     current_role = Column(String(50), nullable=False, default="learner")
+    career_role = Column(String(50), nullable=True)
     is_active = Column(Boolean, default=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
