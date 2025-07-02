@@ -4,7 +4,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   : 'http://localhost:8001/api';
 
 export class ApiClient {
-  private static async makeRequest(endpoint: string, options: RequestInit = {}) {
+  static async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     
     const defaultOptions: RequestInit = {
@@ -60,7 +60,46 @@ export class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  // User API methods
+  static async getUsers() {
+    return this.makeRequest('/users/');
+  }
+
+  static async getAvailableRoles() {
+    return this.makeRequest('/users/roles/available');
+  }
+
+  static async signInUser(userId: number) {
+    return this.makeRequest('/users/sign-in', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    });
+  }
+
+  static async getLearnerProfile(userId: number) {
+    return this.makeRequest(`/users/${userId}/learner-profile`);
+  }
+
+  static async getUserContentProgress(userId: number) {
+    return this.makeRequest(`/users/${userId}/content-progress`);
+  }
 }
+
+// Simple API wrapper for easier usage
+export const api = {
+  get: async (endpoint: string) => {
+    const data = await ApiClient.makeRequest(endpoint);
+    return { data };
+  },
+  post: async (endpoint: string, data?: any) => {
+    const result = await ApiClient.makeRequest(endpoint, { 
+      method: 'POST', 
+      body: data ? JSON.stringify(data) : undefined 
+    });
+    return { data: result };
+  },
+};
 
 // Export lowercase instance for compatibility
 export const apiClient = ApiClient;
