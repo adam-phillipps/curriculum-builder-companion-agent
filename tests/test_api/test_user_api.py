@@ -13,6 +13,9 @@ from src.api.dependencies import get_db
 @pytest.mark.asyncio
 async def test_create_user_endpoint(db_session: AsyncSession):
     """Test creating a user via API."""
+    import uuid
+    unique_email = f"api.john.doe.{uuid.uuid4().hex[:8]}@example.com"
+    
     # Override the database dependency to use test session
     async def override_get_db():
         yield db_session
@@ -24,7 +27,7 @@ async def test_create_user_endpoint(db_session: AsyncSession):
             user_data = {
                 "first_name": "John",
                 "last_name": "Doe",
-                "email": "john.doe@example.com",
+                "email": unique_email,
                 "current_role": "learner"
             }
             
@@ -34,7 +37,7 @@ async def test_create_user_endpoint(db_session: AsyncSession):
             data = response.json()
             assert data["first_name"] == "John"
             assert data["last_name"] == "Doe"
-            assert data["email"] == "john.doe@example.com"
+            assert data["email"] == unique_email
             assert data["current_role"] == "learner"
             assert data["is_active"] is True
     finally:

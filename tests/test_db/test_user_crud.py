@@ -13,10 +13,12 @@ from src.api.schemas.user import UserCreate, UserUpdate, LearnerProfileCreate
 @pytest.mark.asyncio
 async def test_create_user(db_session: AsyncSession):
     """Test creating a new user."""
+    import uuid
+    unique_email = f"john.doe.{uuid.uuid4().hex[:8]}@example.com"
     user_data = UserCreate(
         first_name="John",
         last_name="Doe",
-        email="john.doe@example.com",
+        email=unique_email,
         current_role="learner"
     )
     
@@ -25,7 +27,7 @@ async def test_create_user(db_session: AsyncSession):
     assert user.id is not None
     assert user.first_name == "John"
     assert user.last_name == "Doe"
-    assert user.email == "john.doe@example.com"
+    assert user.email == unique_email
     assert user.current_role == "learner"
     assert user.is_active is True
 
