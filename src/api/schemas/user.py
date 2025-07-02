@@ -3,7 +3,7 @@ User API schemas for requests and responses.
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 class UserCreate(BaseModel):
     """Schema for creating a new user."""
@@ -23,8 +23,7 @@ class UserResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserUpdate(BaseModel):
     """Schema for updating user data."""
@@ -53,8 +52,7 @@ class LearnerProfileResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserContentProgressCreate(BaseModel):
     """Schema for creating content progress records."""
@@ -78,8 +76,7 @@ class UserContentProgressResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserSignInRequest(BaseModel):
     """Schema for simple user sign-in."""

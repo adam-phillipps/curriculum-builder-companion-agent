@@ -1,14 +1,10 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from src.config import BuilderConstants
 
 class BaseSchema(BaseModel):
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    model_config = ConfigDict(from_attributes=True)
 
 class AssessmentQuestionBase(BaseSchema):
     difficulty_tier: str = Field(..., description="Difficulty tier (T1-T4)")
@@ -21,13 +17,15 @@ class AssessmentQuestionBase(BaseSchema):
     usage_count: int = 0
     success_rate: Optional[float] = None
 
-    @validator('difficulty_tier')
+    @field_validator('difficulty_tier')
+    @classmethod
     def validate_tier(cls, v):
         if v not in BuilderConstants.TIERS.get_names():
             raise ValueError(f"Invalid tier. Must be one of {BuilderConstants.TIERS.get_names()}")
         return v
 
-    @validator('personas')
+    @field_validator('personas')
+    @classmethod
     def validate_personas(cls, v):
         valid_personas = BuilderConstants.PERSONAS.get_names()
         for persona in v:
@@ -70,25 +68,29 @@ class LearningContentBase(BaseSchema):
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
 
-    @validator('content_type')
+    @field_validator('content_type')
+    @classmethod
     def validate_content_type(cls, v):
         if v not in BuilderConstants.CONTENT_TYPES.get_names():
             raise ValueError(f"Invalid content type. Must be one of {BuilderConstants.CONTENT_TYPES.get_names()}")
         return v
 
-    @validator('tier')
+    @field_validator('tier')
+    @classmethod
     def validate_tier(cls, v):
         if v not in BuilderConstants.TIERS.get_names():
             raise ValueError(f"Invalid tier. Must be one of {BuilderConstants.TIERS.get_names()}")
         return v
 
-    @validator('sandbox_type')
+    @field_validator('sandbox_type')
+    @classmethod
     def validate_sandbox_type(cls, v):
         if v not in BuilderConstants.SANDBOX_TYPES.get_names():
             raise ValueError(f"Invalid sandbox type. Must be one of {BuilderConstants.SANDBOX_TYPES.get_names()}")
         return v
 
-    @validator('personas')
+    @field_validator('personas')
+    @classmethod
     def validate_personas(cls, v):
         valid_personas = BuilderConstants.PERSONAS.get_names()
         for persona in v:
@@ -147,7 +149,8 @@ class LearningPathwayBase(BaseSchema):
     estimated_duration: int
     total_cost: float = Field(default=0.0, ge=0)
 
-    @validator('target_persona')
+    @field_validator('target_persona')
+    @classmethod
     def validate_persona(cls, v):
         if v not in BuilderConstants.PERSONAS.get_names():
             raise ValueError(f"Invalid persona. Must be one of {BuilderConstants.PERSONAS.get_names()}")
@@ -161,5 +164,5 @@ class LearningPathwayResponse(LearningPathwayBase):
     created_at: datetime
     updated_at: datetime
     items: List[PathwayItemResponse]
-LearningContentResponse.update_forward_refs()
-AssessmentQuestionResponse.update_forward_refs()
+LearningContentResponse.model_rebuild()
+AssessmentQuestionResponse.model_rebuild()
