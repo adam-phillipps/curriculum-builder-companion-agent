@@ -1,5 +1,6 @@
 """Test configuration and fixtures."""
 import pytest
+import pytest_asyncio
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -19,7 +20,7 @@ def event_loop():
     yield loop
     loop.close()
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")
 async def test_engine():
     """Create test database engine."""
     engine = create_async_engine(
@@ -41,7 +42,7 @@ def test_session_factory(test_engine):
     """Create test database session factory."""
     return async_sessionmaker(test_engine, expire_on_commit=False)
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_session(test_session_factory):
     """Create test database session."""
     async with test_session_factory() as session:
@@ -50,7 +51,16 @@ async def test_session(test_session_factory):
         finally:
             await session.rollback()
 
-@pytest.fixture
+@pytest_asyncio.fixture
+async def db_session(test_session_factory):
+    """Create database session for CRUD tests."""
+    async with test_session_factory() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
+
+@pytest_asyncio.fixture
 async def session(test_session_factory):
     """Create database session for tests that expect 'session' fixture."""
     async with test_session_factory() as session:
@@ -59,7 +69,7 @@ async def session(test_session_factory):
         finally:
             await session.rollback()
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     """Create test HTTP client."""
     async with AsyncClient(app=app, base_url="http://test") as ac:

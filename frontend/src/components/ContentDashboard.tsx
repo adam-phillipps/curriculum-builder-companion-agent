@@ -9,7 +9,11 @@ import ContentReviewModal from './ContentReviewModal';
 import ContentManagement from './ContentManagement/ContentManagement';
 import { ContentSubmissionResponse } from '@/types/api';
 
-export default function ContentDashboard() {
+interface ContentDashboardProps {
+  userRole?: string;
+}
+
+export default function ContentDashboard({ userRole = 'learner' }: ContentDashboardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [workflowResult, setWorkflowResult] = useState<ContentSubmissionResponse | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -113,37 +117,41 @@ export default function ContentDashboard() {
           </p>
         </div>
 
-        <Tabs defaultValue="submit" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="submit">Submit Content</TabsTrigger>
+        <Tabs defaultValue={userRole === 'learner' ? 'search' : 'submit'} className="space-y-6">
+          <TabsList className={`grid w-full ${userRole === 'learner' ? 'grid-cols-1' : 'grid-cols-3'}`}>
+            {userRole !== 'learner' && <TabsTrigger value="submit">Submit Content</TabsTrigger>}
             <TabsTrigger value="search">Search Content</TabsTrigger>
-            <TabsTrigger value="manage">Manage Content</TabsTrigger>
+            {userRole !== 'learner' && <TabsTrigger value="manage">Manage Content</TabsTrigger>}
           </TabsList>
 
-          <TabsContent value="submit" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ContentSubmissionForm
-                onSubmissionStart={handleSubmissionStart}
-                onSubmissionComplete={handleSubmissionComplete}
-                disabled={isProcessing}
-              />
-              <WorkflowProgress
-                result={workflowResult}
-                isProcessing={isProcessing}
-                onReset={handleReset}
-                onReviewContent={handleReviewContent}
-                onQuickApprove={handleQuickApprove}
-              />
-            </div>
-          </TabsContent>
+          {userRole !== 'learner' && (
+            <TabsContent value="submit" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <ContentSubmissionForm
+                  onSubmissionStart={handleSubmissionStart}
+                  onSubmissionComplete={handleSubmissionComplete}
+                  disabled={isProcessing}
+                />
+                <WorkflowProgress
+                  result={workflowResult}
+                  isProcessing={isProcessing}
+                  onReset={handleReset}
+                  onReviewContent={handleReviewContent}
+                  onQuickApprove={handleQuickApprove}
+                />
+              </div>
+            </TabsContent>
+          )}
 
           <TabsContent value="search">
             <ContentSearch />
           </TabsContent>
 
-          <TabsContent value="manage">
-            <ContentManagement />
-          </TabsContent>
+          {userRole !== 'learner' && (
+            <TabsContent value="manage">
+              <ContentManagement />
+            </TabsContent>
+          )}
         </Tabs>
 
         {/* Review Modal */}

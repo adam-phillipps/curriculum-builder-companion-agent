@@ -51,10 +51,15 @@ export default function ContentManagement() {
         setLoading(true);
         setError(null);
         
-        const data = await ApiClient.searchContent({ max_results: 12 }); // Load fewer initially
+        // Use direct API call to content endpoint
+        const response = await fetch('http://localhost:8001/api/v1/content');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const data = await response.json();
         
         if (isMounted) {
-          setContents(data.results || []);
+          setContents(data || []);
         }
       } catch (err) {
         if (isMounted) {

@@ -130,6 +130,11 @@ class ResourceTagInfo:
         self.description = description
         self.prefix = prefix
 
+class RoleInfo:
+    def __init__(self, name: str, description: str):
+        self.name = name
+        self.description = description
+
 class BuilderConstants:
     class TIERS:
         T1 = TierInfo("T1", "Foundational", 0)
@@ -232,5 +237,15 @@ class BuilderConstants:
         @classmethod
         def get_names(cls) -> list[str]:
             return [tag.name for tag in [cls.ENVIRONMENT, cls.TIER, cls.ROLE, cls.LESSON, cls.COST_CENTER, cls.LEARNER_ID]]
+
+    class APPLICATION_ROLES:
+        LEARNER = RoleInfo("learner", "Learning-focused user profile")
+        BUILDER = RoleInfo("builder", "Content creation profile")
+        CURRICULUM_ARCHITECT = RoleInfo("curriculum_architect", "Curriculum design profile")
+        ADMIN = RoleInfo("admin", "Administrative profile")
+
+        @classmethod
+        def get_names(cls) -> list[str]:
+            return [role.name for role in [cls.LEARNER, cls.BUILDER, cls.CURRICULUM_ARCHITECT, cls.ADMIN]]
 
 settings = get_settings()
