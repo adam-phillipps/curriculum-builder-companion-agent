@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { api } from '@/lib/api';
 
 interface User {
   id: number;
@@ -31,26 +30,26 @@ export default function UserSignInModal({ isOpen, onClose, onSignIn, onCreateAcc
     setError('');
 
     try {
-      // Get all users with higher limit to include older users like John Doe
-      const response = await fetch('http://localhost:8001/users/?limit=1000');
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const users = await response.json();
+      // Use the new sign-in by identifier endpoint
+      const response = await fetch('http://localhost:8001/users/sign-in/by-identifier', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ identifier: identifier.trim() })
+      });
       
-      const user = users.find((u: User) => 
-        u.email?.toLowerCase().includes(identifier.toLowerCase()) ||
-        u.first_name?.toLowerCase().includes(identifier.toLowerCase()) ||
-        u.last_name?.toLowerCase().includes(identifier.toLowerCase()) ||
-        `${u.first_name} ${u.last_name}`.toLowerCase().includes(identifier.toLowerCase())
-      );
+      if (response.ok) {
+        const signInResponse = await response.json();
+        const user = signInResponse.user;
 
-      if (user) {
         onSignIn(user);
         onClose();
         setIdentifier('');
-      } else {
+      } else if (response.status === 404) {
         setError('User not found. Would you like to create an account?');
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
       console.error('Sign-in failed:', error);

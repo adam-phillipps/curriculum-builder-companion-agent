@@ -3,7 +3,7 @@ CRUD operations for user management.
 """
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
 from src.db.models.user import User, LearnerProfile, UserContentProgress
@@ -40,6 +40,64 @@ async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[U
         .order_by(User.created_at.desc())
     )
     return result.scalars().all()
+
+async def search_users(
+    db: AsyncSession, 
+    search_query: Optional[str] = None,
+    role: Optional[str] = None,
+    skip: int = 0, 
+    limit: int = 100
+) -> List[User]:
+    """Search users by name, email, or role with flexible criteria."""
+    query = select(User)
+    
+    # Add search filters
+    if search_query:
+        search_filter = or_(
+            User.first_name.ilike(f"%{search_query}%"),
+            User.last_name.ilike(f"%{search_query}%"),
+            User.email.ilike(f"%{search_query}%")
+        )
+        query = query.where(search_filter)
+    
+    if role:
+        query = query.where(User.current_role == role)
+    
+    query = query.offset(skip).limit(limit).order_by(User.created_at.desc())
+    
+    result = await db.execute(query)
+    return result.scalars().all()
+
+async def find_user_by_identifier(db: AsyncSession, identifier: str) -> Optional[User]:
+    """Find user by email or name for sign-in purposes."""
+    # First try exact matches
+    result = await db.execute(
+        select(User).where(
+            or_(
+                User.email == identifier,
+                User.first_name == identifier,
+                User.last_name == identifier,
+                (User.first_name + ' ' + User.last_name) == identifier
+            )
+        ).limit(1)
+    )
+    user = result.scalar_one_or_none()
+    
+    # If no exact match, try partial matches
+    if not user:
+        result = await db.execute(
+            select(User).where(
+                or_(
+                    User.email.ilike(f"%{identifier}%"),
+                    User.first_name.ilike(f"%{identifier}%"),
+                    User.last_name.ilike(f"%{identifier}%"),
+                    (User.first_name + ' ' + User.last_name).ilike(f"%{identifier}%")
+                )
+            ).order_by(User.created_at.desc()).limit(1)
+        )
+        user = result.scalar_one_or_none()
+    
+    return user
 
 async def update_user(db: AsyncSession, user_id: int, user_data: UserUpdate) -> Optional[User]:
     """Update user data."""

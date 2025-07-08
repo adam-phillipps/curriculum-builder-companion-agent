@@ -1,18 +1,20 @@
 """
 User management API routes.
 """
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.dependencies import get_db
 from src.api.schemas.user import (
     UserCreate, UserResponse, UserUpdate, UserSignInRequest, UserSignInResponse,
+    UserSignInByIdentifierRequest, UserSearchRequest,
     LearnerProfileResponse, UserContentProgressResponse
 )
 from src.db.crud.user import (
     create_user, get_user, get_users, update_user,
-    get_learner_profile, get_user_content_progress
+    get_learner_profile, get_user_content_progress,
+    search_users, find_user_by_identifier
 )
 from src.config import BuilderConstants
 
@@ -43,12 +45,29 @@ async def create_new_user(
 
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
+    q: Optional[str] = None,
+    role: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db)
 ) -> List[UserResponse]:
-    """Get list of users."""
-    users = await get_users(db, skip=skip, limit=limit)
+    """Get list of users with optional search and filtering."""
+    if q or role:
+        users = await search_users(db, search_query=q, role=role, skip=skip, limit=limit)
+    else:
+        users = await get_users(db, skip=skip, limit=limit)
+    return [UserResponse.model_validate(user) for user in users]
+
+@router.get("/search", response_model=List[UserResponse])
+async def search_users_endpoint(
+    q: Optional[str] = None,
+    role: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db)
+) -> List[UserResponse]:
+    """Search users by name, email, or role."""
+    users = await search_users(db, search_query=q, role=role, skip=skip, limit=limit)
     return [UserResponse.model_validate(user) for user in users]
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -94,12 +113,34 @@ async def sign_in_user(
     sign_in_data: UserSignInRequest,
     db: AsyncSession = Depends(get_db)
 ) -> UserSignInResponse:
-    """Simple user sign-in (no authentication for now)."""
+    """Simple user sign-in by user ID (legacy endpoint)."""
     user = await get_user(db, sign_in_data.user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
+        )
+    
+    learner_profile = None
+    if user.current_role == "learner":
+        learner_profile = await get_learner_profile(db, user.id)
+    
+    return UserSignInResponse(
+        user=UserResponse.model_validate(user),
+        learner_profile=LearnerProfileResponse.model_validate(learner_profile) if learner_profile else None
+    )
+
+@router.post("/sign-in/by-identifier", response_model=UserSignInResponse)
+async def sign_in_by_identifier(
+    sign_in_data: UserSignInByIdentifierRequest,
+    db: AsyncSession = Depends(get_db)
+) -> UserSignInResponse:
+    """Sign in user by email or name identifier."""
+    user = await find_user_by_identifier(db, sign_in_data.identifier)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found with the provided identifier"
         )
     
     learner_profile = None

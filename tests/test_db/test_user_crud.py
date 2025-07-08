@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.crud.user import (
     create_user, get_user, get_users, update_user,
-    create_learner_profile, get_learner_profile
+    create_learner_profile, get_learner_profile,
+    search_users, find_user_by_identifier
 )
 from src.api.schemas.user import UserCreate, UserUpdate, LearnerProfileCreate
 
@@ -154,3 +155,117 @@ async def test_get_learner_profile_not_found(db_session: AsyncSession):
     """Test getting a non-existent learner profile."""
     profile = await get_learner_profile(db_session, 99999)
     assert profile is None
+
+@pytest.mark.asyncio
+async def test_search_users_by_name(db_session: AsyncSession):
+    """Test searching users by name."""
+    # Create test users
+    await create_user(db_session, UserCreate(first_name="John", last_name="Doe", current_role="learner"))
+    await create_user(db_session, UserCreate(first_name="Jane", last_name="Smith", current_role="builder"))
+    await create_user(db_session, UserCreate(first_name="Bob", last_name="Johnson", current_role="learner"))
+    
+    # Search by first name
+    results = await search_users(db_session, search_query="John")
+    assert len(results) >= 1
+    assert any(user.first_name == "John" for user in results)
+    
+    # Search by last name
+    results = await search_users(db_session, search_query="Smith")
+    assert len(results) >= 1
+    assert any(user.last_name == "Smith" for user in results)
+
+@pytest.mark.asyncio
+async def test_search_users_by_email(db_session: AsyncSession):
+    """Test searching users by email."""
+    import uuid
+    unique_email = f"test.{uuid.uuid4().hex[:8]}@example.com"
+    
+    await create_user(db_session, UserCreate(
+        first_name="Test", 
+        email=unique_email, 
+        current_role="learner"
+    ))
+    
+    results = await search_users(db_session, search_query="test")
+    assert len(results) >= 1
+    assert any(unique_email in (user.email or "") for user in results)
+
+@pytest.mark.asyncio
+async def test_search_users_by_role(db_session: AsyncSession):
+    """Test searching users by role."""
+    await create_user(db_session, UserCreate(first_name="Learner1", current_role="learner"))
+    await create_user(db_session, UserCreate(first_name="Builder1", current_role="builder"))
+    
+    # Search by role only
+    results = await search_users(db_session, role="learner")
+    assert len(results) >= 1
+    assert all(user.current_role == "learner" for user in results)
+
+@pytest.mark.asyncio
+async def test_search_users_combined_filters(db_session: AsyncSession):
+    """Test searching users with combined name and role filters."""
+    await create_user(db_session, UserCreate(first_name="Alice", current_role="learner"))
+    await create_user(db_session, UserCreate(first_name="Alice", current_role="builder"))
+    
+    # Search by name and role
+    results = await search_users(db_session, search_query="Alice", role="learner")
+    assert len(results) >= 1
+    assert all(user.first_name == "Alice" and user.current_role == "learner" for user in results)
+
+@pytest.mark.asyncio
+async def test_search_users_no_results(db_session: AsyncSession):
+    """Test searching users with no matching results."""
+    results = await search_users(db_session, search_query="NonExistentUser")
+    assert len(results) == 0
+
+@pytest.mark.asyncio
+async def test_find_user_by_identifier_email(db_session: AsyncSession):
+    """Test finding user by email identifier."""
+    import uuid
+    unique_email = f"signin.{uuid.uuid4().hex[:8]}@example.com"
+    
+    created_user = await create_user(db_session, UserCreate(
+        first_name="SignIn",
+        email=unique_email,
+        current_role="learner"
+    ))
+    
+    # Find by full email
+    found_user = await find_user_by_identifier(db_session, unique_email)
+    assert found_user is not None
+    assert found_user.id == created_user.id
+    
+    # Find by partial email
+    found_user = await find_user_by_identifier(db_session, "signin")
+    assert found_user is not None
+    assert found_user.id == created_user.id
+
+@pytest.mark.asyncio
+async def test_find_user_by_identifier_name(db_session: AsyncSession):
+    """Test finding user by name identifier."""
+    created_user = await create_user(db_session, UserCreate(
+        first_name="FindMe",
+        last_name="ByName",
+        current_role="learner"
+    ))
+    
+    # Find by first name
+    found_user = await find_user_by_identifier(db_session, "FindMe")
+    assert found_user is not None
+    assert found_user.id == created_user.id
+    
+    # Find by last name
+    found_user = await find_user_by_identifier(db_session, "ByName")
+    assert found_user is not None
+    assert found_user.id == created_user.id
+    
+    # Find by full name
+    found_user = await find_user_by_identifier(db_session, "FindMe ByName")
+    assert found_user is not None
+    assert found_user.id == created_user.id
+
+@pytest.mark.asyncio
+async def test_find_user_by_identifier_not_found(db_session: AsyncSession):
+    """Test finding user with non-existent identifier."""
+    found_user = await find_user_by_identifier(db_session, "NonExistentUser")
+    assert found_user is None
