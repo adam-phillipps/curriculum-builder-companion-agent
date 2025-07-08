@@ -31,9 +31,12 @@ export default function UserSignInModal({ isOpen, onClose, onSignIn, onCreateAcc
     setError('');
 
     try {
-      // Get all users and find match by email, name, or partial match
-      const response = await api.get('/users/');
-      const users = response.data;
+      // Get all users with higher limit to include older users like John Doe
+      const response = await fetch('http://localhost:8001/users/?limit=1000');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const users = await response.json();
       
       const user = users.find((u: User) => 
         u.email?.toLowerCase().includes(identifier.toLowerCase()) ||

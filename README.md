@@ -167,8 +167,108 @@ tests/
 └── conftest.py      # Test configuration
 
 scripts/
-└── dev-setup.sh     # Development environment setup
+├── dev-setup.sh     # Development environment setup
+├── generate_pathway_data.py  # Generate test pathway data
+├── generate_sankey_data.py   # Generate Sankey visualization data
+├── generate_content_progress.py  # Generate user content progress data
+├── init_db.py       # Initialize database
+├── migrate.py       # Run database migrations
+└── run-tests.sh     # Run test suite
 ```
+
+## 📜 Scripts Usage
+
+### Database Management
+
+**Initialize Database**
+```bash
+docker compose exec app python scripts/init_db.py
+```
+
+**Run Database Migrations**
+```bash
+docker compose exec app python scripts/migrate.py
+```
+
+### Test Data Generation
+
+**Generate Simple Linear Pathway**
+```bash
+docker compose exec app python scripts/generate_pathway_data.py --type simple
+```
+
+**Generate Complex Multi-Branch Pathway**
+```bash
+docker compose exec app python scripts/generate_pathway_data.py --type complex
+```
+
+**Generate Sankey Visualization Data**
+```bash
+docker compose exec app python scripts/generate_sankey_data.py
+```
+
+**Generate User Content Progress Data**
+```bash
+# Generate progress for default user (ID=1) and content IDs 101-106
+docker compose exec app python scripts/generate_content_progress.py
+
+# Generate progress for specific user
+docker compose exec app python scripts/generate_content_progress.py --user-id 2
+
+# Generate progress for specific content IDs
+docker compose exec app python scripts/generate_content_progress.py --content-ids 101 102 103
+
+# Generate progress for specific user and content IDs
+docker compose exec app python scripts/generate_content_progress.py --user-id 2 --content-ids 101 102
+```
+
+### Testing
+
+**Run All Tests**
+```bash
+docker compose exec app python scripts/run-tests.sh
+```
+
+**Run Specific Test File**
+```bash
+docker compose exec app pytest tests/test_db/test_crud.py -v
+```
+
+**Run Tests with Coverage**
+```bash
+docker compose exec app pytest --cov=src
+```
+
+### Development Setup
+
+**Complete Development Environment Setup**
+```bash
+./scripts/dev-setup.sh
+```
+
+### Pathway Data Generation Details
+
+The `generate_pathway_data.py` script creates realistic learning pathway data for testing:
+
+**Simple Pathway** (`--type simple`):
+- Creates 4 learning content items in linear progression
+- Prerequisites: 1→2→3→4
+- Good for basic testing and simple visualizations
+- Generates skill assessments and user progress data
+
+**Complex Pathway** (`--type complex`):
+- Creates 6 learning content items in tree structure
+- Multi-branch flow: Math + Programming → ML Theory → Neural Networks
+- Tree structure with proper prerequisite relationships
+- Learning objectives: Mathematics Fundamentals, Programming Fundamentals, ML Theory, Neural Networks Mastery
+- Generates realistic progress data with mixed completion states
+
+**Generated Data Includes**:
+- Learning pathway with target persona and duration
+- Pathway items with weights, prerequisites, and completion status
+- User content progress with realistic percentages and time spent
+- Skill assessments across multiple categories
+- Learning objectives and content relationships
 
 ### Key Components
 
@@ -176,6 +276,7 @@ scripts/
 - **Database** (`src/db/`): SQLAlchemy models and async CRUD operations
 - **API Routes** (`src/api/`): FastAPI endpoints with dependency injection
 - **Configuration** (`src/config.py`): Environment-based settings and constants
+- **Scripts** (`scripts/`): Database management and test data generation utilities
 
 ### Adding New Features
 
