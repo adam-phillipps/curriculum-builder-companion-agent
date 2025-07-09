@@ -8,7 +8,7 @@ import ContentViewer from './ContentViewer';
 import { ApiClient } from '../../lib/api';
 
 interface Content {
-  content_id: number;
+  id: number;
   title: string;
   description: string;
   tier: string;
@@ -22,11 +22,26 @@ interface Content {
   similarity_score?: number;
 }
 
-export default function ContentManagement() {
+interface User {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  current_role: string;
+}
+
+interface ContentManagementProps {
+  currentUser?: User | null;
+}
+
+export default function ContentManagement({ currentUser }: ContentManagementProps) {
   const [contents, setContents] = useState<Content[]>([]);
   const [filteredContents, setFilteredContents] = useState<Content[]>([]);
+  const [displayedContents, setDisplayedContents] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const ITEMS_PER_PAGE = 20;
   
   // Modal states
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
@@ -87,7 +102,7 @@ export default function ContentManagement() {
       
       const data = await response.json();
       const similarityResults = data.results.map((item: any) => ({
-        content_id: item.id,
+        id: item.content_id || item.id, // Handle both field names
         title: item.title || 'Untitled',
         description: item.description || '',
         tier: item.tier || 'T2',
@@ -110,38 +125,56 @@ export default function ContentManagement() {
     }
   };
 
-  // Lazy load content - only fetch when tab is active
-  useEffect(() => {
-    let isMounted = true;
-    
-    const fetchContent = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Use direct API call to content endpoint
-        const response = await fetch('http://localhost:8001/api/v1/content');
+  // Fetch all content with proper pagination
+  const fetchAllContent = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      let allContent: Content[] = [];
+      let skip = 0;
+      const limit = 100; // Max allowed by API
+      let hasMore = true;
+      
+      while (hasMore) {
+        const response = await fetch(`http://localhost:8001/api/v1/content?skip=${skip}&limit=${limit}`);
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         const data = await response.json();
         
-        if (isMounted) {
-          setContents(data || []);
+        if (data.length === 0) {
+          hasMore = false;
+        } else {
+          allContent = [...allContent, ...data];
+          skip += limit;
+          // If we got less than the limit, we've reached the end
+          if (data.length < limit) {
+            hasMore = false;
+          }
         }
-      } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load content');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+      }
+      
+      setContents(allContent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load content');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Lazy load content - only fetch when tab is active
+  useEffect(() => {
+    let isMounted = true;
+    
+    const initializeContent = async () => {
+      if (isMounted) {
+        await fetchAllContent();
       }
     };
 
     // Delay fetch to improve perceived performance
-    const timer = setTimeout(fetchContent, 100);
+    const timer = setTimeout(initializeContent, 100);
     
     return () => {
       isMounted = false;
@@ -173,7 +206,40 @@ export default function ContentManagement() {
     }
 
     setFilteredContents(filtered);
+    setPage(1); // Reset pagination when filters change
   }, [contents, filters]);
+  
+  // Update displayed contents when filtered contents or page changes
+  useEffect(() => {
+    const startIndex = 0;
+    const endIndex = page * ITEMS_PER_PAGE;
+    const newDisplayed = filteredContents.slice(startIndex, endIndex);
+    setDisplayedContents(newDisplayed);
+    setHasMore(endIndex < filteredContents.length);
+  }, [filteredContents, page]);
+  
+  // Infinite scroll handler
+  const loadMore = () => {
+    if (hasMore && !loading) {
+      setPage(prev => prev + 1);
+    }
+  };
+  
+  // Scroll event listener
+  useEffect(() => {
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.scrollTop + target.clientHeight >= target.scrollHeight - 100) {
+        loadMore();
+      }
+    };
+    
+    const scrollContainer = document.getElementById('content-scroll-container');
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', handleScroll);
+      return () => scrollContainer.removeEventListener('scroll', handleScroll);
+    }
+  }, [hasMore, loading]);
 
   const handleTileClick = (content: Content) => {
     setSelectedContent(content);
@@ -186,15 +252,17 @@ export default function ContentManagement() {
   };
 
   const handleViewContent = () => {
-    if (selectedContent) {
-      setViewingContentIds(prev => [...prev, selectedContent.content_id]);
+    if (selectedContent && selectedContent.id != null && !isNaN(selectedContent.id)) {
+      setViewingContentIds(prev => [...prev, selectedContent.id]);
       setShowPreviewModal(false);
       setSelectedContent(null);
     }
   };
 
   const handleCloseContentViewer = (contentId: number) => {
-    setViewingContentIds(prev => prev.filter(id => id !== contentId));
+    if (contentId != null && !isNaN(contentId)) {
+      setViewingContentIds(prev => prev.filter(id => id !== contentId));
+    }
   };
 
   if (loading) {
@@ -243,7 +311,7 @@ export default function ContentManagement() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Content Management</h1>
         <p className="text-gray-600 mt-1">
-          Browse and manage learning content. Found {filteredContents.length} items.
+          Browse and manage learning content. Showing {displayedContents.length} of {filteredContents.length} items.
           {usingSimilaritySearch && " (similarity search results)"}
         </p>
       </div>
@@ -267,11 +335,11 @@ export default function ContentManagement() {
           />
           {similarityQuery && (
             <button
-              onClick={() => {
+              onClick={async () => {
                 setSimilarityQuery('');
                 setUsingSimilaritySearch(false);
                 // Reload original content
-                window.location.reload();
+                await fetchAllContent();
               }}
               className="px-3 py-2 text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg"
               title="Clear search"
@@ -293,7 +361,7 @@ export default function ContentManagement() {
         onToggle={() => setShowFilters(!showFilters)}
       />
 
-      {/* Content Grid */}
+      {/* Content Grid with Infinite Scroll */}
       {filteredContents.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📚</div>
@@ -306,20 +374,35 @@ export default function ContentManagement() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredContents.map((content) => (
-            <div key={content.content_id} className="relative">
-              <ContentTile
-                content={content}
-                onClick={() => handleTileClick(content)}
-              />
-              {usingSimilaritySearch && content.similarity_score && (
-                <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
-                  {Math.round(content.similarity_score * 100)}%
-                </div>
-              )}
+        <div 
+          id="content-scroll-container"
+          className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {displayedContents.map((content, index) => (
+              <div key={`content-${content.id}-${index}`} className="relative">
+                <ContentTile
+                  content={content}
+                  onClick={() => handleTileClick(content)}
+                />
+                {usingSimilaritySearch && content.similarity_score && (
+                  <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                    {Math.round(content.similarity_score * 100)}%
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {hasMore && (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500">Scroll down to load more content...</p>
             </div>
-          ))}
+          )}
+          {!hasMore && displayedContents.length > 0 && (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500">All content loaded ({filteredContents.length} items)</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -330,13 +413,14 @@ export default function ContentManagement() {
           isOpen={showPreviewModal}
           onClose={handleClosePreviewModal}
           onViewContent={handleViewContent}
+          currentUser={currentUser}
         />
       )}
 
       {/* Content Viewers */}
-      {viewingContentIds.map((contentId) => (
+      {viewingContentIds.filter(id => id != null && !isNaN(id)).map((contentId) => (
         <ContentViewer
-          key={contentId}
+          key={`content-viewer-${contentId}`}
           contentId={contentId}
           onClose={() => handleCloseContentViewer(contentId)}
         />

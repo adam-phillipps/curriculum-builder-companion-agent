@@ -161,7 +161,7 @@ export default function HomePage() {
                 Browse and manage learning content items
               </p>
             </div>
-            <ContentManagement />
+            <ContentManagement currentUser={currentUser} />
           </div>
         );
       case 'admin':
@@ -177,7 +177,7 @@ export default function HomePage() {
                 Browse and manage learning content items
               </p>
             </div>
-            <ContentManagement />
+            <ContentManagement currentUser={currentUser} />
           </div>
         );
     }

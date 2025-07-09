@@ -2,7 +2,7 @@
 
 interface ContentTileProps {
   content: {
-    content_id: number;
+    id: number;
     title: string;
     estimated_duration: number;
     tier: string;
@@ -68,7 +68,7 @@ export default function ContentTile({ content, onClick }: ContentTileProps) {
         </div>
         
         <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-400">ID: {content.content_id}</span>
+          <span className="text-gray-400">ID: {content.id}</span>
           {content.author && (
             <span className="text-gray-500 truncate max-w-20">{content.author}</span>
           )}

@@ -64,6 +64,7 @@ class UserContentProgress(Base):
     
     status = Column(String(20), nullable=False, default="not_started")  # not_started, in_progress, completed, skipped
     progress_percentage = Column(Integer, default=0)  # 0-100
+    comprehension_percentage = Column(Float, nullable=True, default=0.0)  # 0-100 self-assessed comprehension
     
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)

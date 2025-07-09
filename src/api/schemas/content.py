@@ -51,9 +51,10 @@ class AssessmentQuestionResponse(AssessmentQuestionBase):
     related_content: List['LearningContentResponse']
 
 class LearningContentBase(BaseSchema):
-    code_title: str = Field(..., pattern=r"T[1-4]\.[A-Z]{3}\.\d{3}")
+    code_title: str = Field(..., pattern=r"T[1-4]\.[A-Z]{2,3}\.\d{3}")
     title: str
     description: str
+    content_body: Optional[str] = None
     content_type: str
     tier: str
     personas: List[str]
@@ -98,6 +99,7 @@ class LearningContentBase(BaseSchema):
                 raise ValueError(f"Invalid persona. Must be one of {valid_personas}")
         return v
 class LearningContentCreate(LearningContentBase):
+    code_title: str = Field(..., pattern=r"T[1-4]\.[A-Z]{2,3}\.\d{3}")
     prerequisite_ids: Optional[List[int]] = None
     assessment_question_ids: Optional[List[int]] = None
 

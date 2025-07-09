@@ -19,8 +19,8 @@ interface FullContent {
   estimated_duration: number;
   personas: string[];
   author?: string;
-  // This would contain the actual learning content
-  full_content?: string;
+  // This contains the actual learning content
+  content_body?: string;
 }
 
 /**
@@ -69,17 +69,15 @@ export default function ContentViewer({ contentId, onClose }: ContentViewerProps
         setLoading(true);
         setError(null);
         
-        // First get all content, then find the specific item
-        const response = await fetch('http://localhost:8001/api/v1/content');
+        // Get specific content item by ID
+        const response = await fetch(`http://localhost:8001/api/v1/content/${contentId}`);
         if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error(`Content with ID ${contentId} not found`);
+          }
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        const allContent = await response.json();
-        const data = allContent.find((item: any) => item.id === contentId);
-        
-        if (!data) {
-          throw new Error(`Content with ID ${contentId} not found`);
-        }
+        const data = await response.json();
         setContent(data);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load content';
@@ -171,11 +169,10 @@ export default function ContentViewer({ contentId, onClose }: ContentViewerProps
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Content</h2>
           <div className="prose max-w-none">
-            {content.full_content ? (
-              <div 
-                className="text-gray-700 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: content.full_content }}
-              />
+            {content.content_body ? (
+              <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {content.content_body}
+              </div>
             ) : (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
                 <div className="text-4xl mb-4">📚</div>

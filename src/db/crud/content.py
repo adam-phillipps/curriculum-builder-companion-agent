@@ -27,6 +27,7 @@ async def create_content(
         code_title=content.code_title,
         title=content.title,
         description=content.description,
+        content_body=content.content_body,
         content_type=content.content_type,
         tier=content.tier,
         personas=content.personas,
