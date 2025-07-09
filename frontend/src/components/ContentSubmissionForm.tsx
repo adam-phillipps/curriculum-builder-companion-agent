@@ -4,6 +4,22 @@ import { useState } from 'react';
 import { apiClient } from '@/lib/api';
 import { ContentSubmissionRequest, ContentSubmissionResponse } from '@/types/api';
 
+interface SimilarContent {
+  id: number;
+  title: string;
+  description: string;
+  content_type: string;
+  author?: string;
+  created_at: string;
+  similarity_score: number;
+}
+
+interface SimilaritySearchResponse {
+  results: SimilarContent[];
+  total_found: number;
+  search_time_ms?: number;
+}
+
 interface Props {
   onSubmissionStart: () => void;
   onSubmissionComplete: (result: ContentSubmissionResponse) => void;
@@ -29,6 +45,56 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
     ai_assisted: '',
   });
   const [error, setError] = useState<string | null>(null);
+  const [similarContent, setSimilarContent] = useState<SimilarContent[]>([]);
+  const [checkingSimilarity, setCheckingSimilarity] = useState(false);
+  const [showSimilarContent, setShowSimilarContent] = useState(false);
+  const [similarityQuery, setSimilarityQuery] = useState('');
+
+  const checkSimilarity = async () => {
+    if (!similarityQuery.trim()) return;
+    
+    setCheckingSimilarity(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('http://localhost:8001/api/v1/vector/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query_text: similarityQuery,
+          similarity_threshold: 0.3,
+          max_results: 10,
+          search_approved_only: false
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data: SimilaritySearchResponse = await response.json();
+      setSimilarContent(data.results);
+      setShowSimilarContent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Similarity check failed');
+    } finally {
+      setCheckingSimilarity(false);
+    }
+  };
+  
+  const getSimilarityColor = (score: number) => {
+    if (score >= 0.8) return 'text-red-600 bg-red-50 border-red-200';
+    if (score >= 0.6) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    return 'text-green-600 bg-green-50 border-green-200';
+  };
+  
+  const getSimilarityWarning = (score: number) => {
+    if (score >= 0.8) return 'High similarity detected - please review carefully';
+    if (score >= 0.6) return 'Similar content found - please review before submitting';
+    return 'Low similarity - content appears unique';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +102,36 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
     onSubmissionStart();
 
     try {
-      const result = await apiClient.submitContent(formData);
+      // Submit to the agentic workflow endpoint
+      const response = await fetch('http://localhost:8001/api/v1/agents/process-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: formData.content,
+          title: formData.title,
+          model_provider: formData.model_provider,
+          model_name: formData.model_name,
+          suggested_tier: formData.suggested_tier,
+          suggested_personas: formData.suggested_personas,
+          suggested_content_type: formData.suggested_content_type,
+          suggested_tags: formData.suggested_tags,
+          suggested_duration: formData.suggested_duration,
+          suggested_sandbox_type: formData.suggested_sandbox_type,
+          author: formData.author,
+          co_authors: formData.co_authors,
+          sources: formData.sources,
+          artifacts: formData.artifacts,
+          ai_assisted: formData.ai_assisted
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
       onSubmissionComplete(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -219,6 +314,76 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
           <p className="text-xs text-gray-500 mt-1">Separate multiple tags with commas</p>
         </div>
 
+
+
+        {/* Similarity Search Section */}
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Check for Similar Content</h3>
+          <p className="text-sm text-gray-600 mb-3">
+            Search for existing content similar to what you're planning to submit. This helps avoid duplicates.
+          </p>
+          
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="Enter title, description, or key concepts to search for similar content..."
+              value={similarityQuery}
+              onChange={(e) => setSimilarityQuery(e.target.value)}
+              disabled={disabled}
+            />
+            <button
+              type="button"
+              onClick={checkSimilarity}
+              disabled={disabled || checkingSimilarity || !similarityQuery.trim()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {checkingSimilarity ? 'Checking...' : 'Check Similarity'}
+            </button>
+          </div>
+          
+          {showSimilarContent && (
+            <div className="mt-4">
+              <h4 className="font-medium text-gray-900 mb-2">
+                Found {similarContent.length} similar content items
+              </h4>
+              
+              {similarContent.length === 0 ? (
+                <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-lg p-3">
+                  ✅ No similar content found - your content appears to be unique!
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {similarContent.map((item) => (
+                    <div key={item.id} className={`border rounded-lg p-3 ${getSimilarityColor(item.similarity_score)}`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <h5 className="font-medium">{item.title}</h5>
+                        <span className="text-sm font-medium">
+                          {Math.round(item.similarity_score * 100)}% similar
+                        </span>
+                      </div>
+                      <p className="text-sm mb-2">{item.description}</p>
+                      <div className="flex justify-between text-xs">
+                        <span>Type: {item.content_type}</span>
+                        <span>Author: {item.author || 'Unknown'}</span>
+                        <span>Created: {new Date(item.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {similarContent.some(item => item.similarity_score >= 0.6) && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
+                      <p className="text-sm text-yellow-800">
+                        ⚠️ {getSimilarityWarning(Math.max(...similarContent.map(item => item.similarity_score)))}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-4">
           <div>
             <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-2">
@@ -309,10 +474,14 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
         <button
           type="submit"
           disabled={disabled || !formData.content.trim()}
-          className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
         >
-          {disabled ? 'Processing...' : 'Submit Content'}
+          {disabled ? 'Processing with AI...' : 'Submit Content for AI Processing'}
         </button>
+        
+        <div className="text-xs text-gray-500 text-center mt-2">
+          Content will be processed through our AI workflow for metadata extraction and similarity checking
+        </div>
       </form>
     </div>
   );

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import ContentSubmissionForm from './ContentSubmissionForm';
 import WorkflowProgress from './WorkflowProgress';
-import ContentSearch from './ContentSearch';
+
 import ContentReviewModal from './ContentReviewModal';
 import ContentManagement from './ContentManagement/ContentManagement';
 import { ContentSubmissionResponse } from '@/types/api';
@@ -117,42 +117,26 @@ export default function ContentDashboard({ userRole = 'learner' }: ContentDashbo
           </p>
         </div>
 
-        <Tabs defaultValue={userRole === 'learner' ? 'search' : 'submit'} className="space-y-6">
-          <TabsList className={`grid w-full ${userRole === 'learner' ? 'grid-cols-1' : 'grid-cols-3'}`}>
-            {userRole !== 'learner' && <TabsTrigger value="submit">Submit Content</TabsTrigger>}
-            <TabsTrigger value="search">Search Content</TabsTrigger>
-            {userRole !== 'learner' && <TabsTrigger value="manage">Manage Content</TabsTrigger>}
-          </TabsList>
-
-          {userRole !== 'learner' && (
-            <TabsContent value="submit" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ContentSubmissionForm
-                  onSubmissionStart={handleSubmissionStart}
-                  onSubmissionComplete={handleSubmissionComplete}
-                  disabled={isProcessing}
-                />
-                <WorkflowProgress
-                  result={workflowResult}
-                  isProcessing={isProcessing}
-                  onReset={handleReset}
-                  onReviewContent={handleReviewContent}
-                  onQuickApprove={handleQuickApprove}
-                />
-              </div>
-            </TabsContent>
-          )}
-
-          <TabsContent value="search">
-            <ContentSearch />
-          </TabsContent>
-
-          {userRole !== 'learner' && (
-            <TabsContent value="manage">
-              <ContentManagement />
-            </TabsContent>
-          )}
-        </Tabs>
+        {userRole === 'learner' ? (
+          <ContentManagement />
+        ) : (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ContentSubmissionForm
+                onSubmissionStart={handleSubmissionStart}
+                onSubmissionComplete={handleSubmissionComplete}
+                disabled={isProcessing}
+              />
+              <WorkflowProgress
+                result={workflowResult}
+                isProcessing={isProcessing}
+                onReset={handleReset}
+                onReviewContent={handleReviewContent}
+                onQuickApprove={handleQuickApprove}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Review Modal */}
         {showReviewModal && reviewContent && (

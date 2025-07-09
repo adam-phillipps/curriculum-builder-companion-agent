@@ -100,28 +100,24 @@ export default function HomePage() {
       case 'learner':
         return [
           { id: 'profile', label: 'My Learning Profile' },
-          { id: 'similarity-search', label: 'Similarity Search' },
           { id: 'catalog', label: 'Content Catalog' }
         ];
       
       case 'builder':
         return [
-          { id: 'builder-profile', label: 'Builder Profile' },
-          { id: 'similarity-search', label: 'Similarity Search' },
+          { id: 'builder-profile', label: 'Content Builder' },
           { id: 'catalog', label: 'Content Catalog' }
         ];
       
       case 'curriculum_architect':
         return [
           { id: 'architect-profile', label: 'Architect Profile' },
-          { id: 'similarity-search', label: 'Similarity Search' },
           { id: 'catalog', label: 'Content Catalog' }
         ];
       
       case 'admin':
         return [
           { id: 'profile', label: 'Admin Profile' },
-          { id: 'similarity-search', label: 'Similarity Search' },
           { id: 'catalog', label: 'Content Catalog' },
           { id: 'admin', label: 'Administration' }
         ];
@@ -138,11 +134,22 @@ export default function HomePage() {
       case 'profile':
         return <LearnerProfile userId={currentUser.id} />;
       case 'builder-profile':
-        return <div className="p-6 text-center text-gray-600">Builder Profile - Coming Soon</div>;
+        return (
+          <div className="container mx-auto px-4 py-8">
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Content Builder
+              </h1>
+              <p className="text-gray-600">
+                Create and submit new learning content
+              </p>
+            </div>
+            <ContentDashboard userRole="builder" />
+          </div>
+        );
       case 'architect-profile':
         return <div className="p-6 text-center text-gray-600">Curriculum Architect Profile - Coming Soon</div>;
-      case 'similarity-search':
-        return <div className="p-6 text-center text-gray-600">Similarity Search - Coming Soon</div>;
+
       case 'catalog':
         return (
           <div className="container mx-auto px-4 py-8">

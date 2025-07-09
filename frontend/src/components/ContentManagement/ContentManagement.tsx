@@ -41,6 +41,74 @@ export default function ContentManagement() {
     sandbox_type: ''
   });
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Similarity search states
+  const [similarityQuery, setSimilarityQuery] = useState('');
+  const [searchingSimilarity, setSearchingSimilarity] = useState(false);
+  const [usingSimilaritySearch, setUsingSimilaritySearch] = useState(false);
+
+  // Debounced similarity search
+  useEffect(() => {
+    if (!similarityQuery.trim()) {
+      setUsingSimilaritySearch(false);
+      return;
+    }
+    
+    const timeoutId = setTimeout(async () => {
+      await performSimilaritySearch(similarityQuery);
+    }, 500); // 500ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [similarityQuery]);
+  
+  const performSimilaritySearch = async (query: string) => {
+    if (!query.trim()) return;
+    
+    setSearchingSimilarity(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('http://localhost:8001/api/v1/vector/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query_text: query,
+          similarity_threshold: 0.1,
+          max_results: 50,
+          search_approved_only: false
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Similarity search failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const similarityResults = data.results.map((item: any) => ({
+        content_id: item.id,
+        title: item.title || 'Untitled',
+        description: item.description || '',
+        tier: item.tier || 'T2',
+        content_type: item.content_type || 'lesson',
+        estimated_duration: item.estimated_duration || 60,
+        learning_objectives: item.learning_objectives || [],
+        personas: item.personas || [],
+        author: item.author,
+        sandbox_type: item.sandbox_type,
+        aws_services: item.aws_services || [],
+        similarity_score: item.similarity_score
+      }));
+      
+      setContents(similarityResults);
+      setUsingSimilaritySearch(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Similarity search failed');
+    } finally {
+      setSearchingSimilarity(false);
+    }
+  };
 
   // Lazy load content - only fetch when tab is active
   useEffect(() => {
@@ -85,6 +153,7 @@ export default function ContentManagement() {
   useEffect(() => {
     let filtered = contents;
 
+    // Apply traditional filters to similarity results or regular content
     if (filters.tier) {
       filtered = filtered.filter(content => content.tier === filters.tier);
     }
@@ -175,7 +244,45 @@ export default function ContentManagement() {
         <h1 className="text-2xl font-bold text-gray-900">Content Management</h1>
         <p className="text-gray-600 mt-1">
           Browse and manage learning content. Found {filteredContents.length} items.
+          {usingSimilaritySearch && " (similarity search results)"}
         </p>
+      </div>
+      
+      {/* Similarity Search */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="text-lg">🔍</div>
+          <h3 className="font-medium text-gray-900">Find Similar Content</h3>
+        </div>
+        <p className="text-sm text-gray-600 mb-3">
+          Search for content using natural language. Results are ordered by similarity.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            placeholder="e.g., 'AWS Lambda tutorial', 'machine learning basics', 'Python data analysis'..."
+            value={similarityQuery}
+            onChange={(e) => setSimilarityQuery(e.target.value)}
+          />
+          {similarityQuery && (
+            <button
+              onClick={() => {
+                setSimilarityQuery('');
+                setUsingSimilaritySearch(false);
+                // Reload original content
+                window.location.reload();
+              }}
+              className="px-3 py-2 text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg"
+              title="Clear search"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {searchingSimilarity && (
+          <p className="text-sm text-blue-600 mt-2">🔄 Searching for similar content...</p>
+        )}
       </div>
 
       {/* Filters */}
@@ -201,11 +308,17 @@ export default function ContentManagement() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredContents.map((content) => (
-            <ContentTile
-              key={content.content_id}
-              content={content}
-              onClick={() => handleTileClick(content)}
-            />
+            <div key={content.content_id} className="relative">
+              <ContentTile
+                content={content}
+                onClick={() => handleTileClick(content)}
+              />
+              {usingSimilaritySearch && content.similarity_score && (
+                <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                  {Math.round(content.similarity_score * 100)}%
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
