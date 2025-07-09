@@ -192,3 +192,21 @@ async def get_user_content_progress(db: AsyncSession, user_id: int) -> List[User
         .order_by(UserContentProgress.last_accessed_at.desc())
     )
     return result.scalars().all()
+
+async def update_learner_profile_goal(
+    db: AsyncSession, 
+    user_id: int, 
+    learning_outcome_id: int
+) -> bool:
+    """Update learner profile's primary learning goal."""
+    result = await db.execute(
+        select(LearnerProfile).where(LearnerProfile.user_id == user_id)
+    )
+    profile = result.scalar_one_or_none()
+    
+    if not profile:
+        return False
+    
+    profile.primary_learning_outcome_id = learning_outcome_id
+    await db.commit()
+    return True

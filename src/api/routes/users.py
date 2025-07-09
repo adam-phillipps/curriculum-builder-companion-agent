@@ -11,6 +11,7 @@ from src.api.schemas.user import (
     UserSignInByIdentifierRequest, UserSearchRequest,
     LearnerProfileResponse, UserContentProgressResponse
 )
+from pydantic import BaseModel
 from src.db.crud.user import (
     create_user, get_user, get_users, update_user,
     get_learner_profile, get_user_content_progress,
@@ -184,3 +185,29 @@ async def get_available_roles() -> List[str]:
 async def get_available_career_roles() -> List[str]:
     """Get list of available career/job roles."""
     return BuilderConstants.PERSONAS.get_names()
+
+class SetPrimaryGoalRequest(BaseModel):
+    learning_outcome_id: int
+
+@router.put("/{user_id}/primary-goal")
+async def set_primary_learning_goal(
+    user_id: int,
+    goal_data: SetPrimaryGoalRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Set user's primary learning goal."""
+    from src.db.crud.user import update_learner_profile_goal
+    
+    success = await update_learner_profile_goal(
+        db=db,
+        user_id=user_id,
+        learning_outcome_id=goal_data.learning_outcome_id
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User or learner profile not found"
+        )
+    
+    return {"message": "Primary learning goal updated successfully"}

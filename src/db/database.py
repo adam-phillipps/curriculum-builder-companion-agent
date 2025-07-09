@@ -13,6 +13,7 @@ from src.db.models.content import *
 from src.db.models.pricing import *
 from src.db.models.topic import *
 from src.db.models.user import *
+from src.db.models.learning_outcomes import *
 
 # Create async engine
 engine = create_async_engine(
