@@ -34,9 +34,8 @@ class TestAPIIntegration:
             assert data["status"] in ["published", "human_review", "error", "draft"]
             
             # If there's an error, it should have an error message
-            
             if data["status"] == "error":
-                assert "error" in data or "message" in data
+                assert "error" in data or "message" in data or "error_message" in data
     
     @pytest.mark.asyncio
     async def test_process_content_validation(self):

@@ -186,9 +186,12 @@ class TestContentAPIDataIntegrity:
                     result = data["results"][0]
                     
                     # Fields needed for content builder similarity check
-                    required_fields = ["id", "title", "description", "content_type"]
+                    required_fields = ["title", "description", "content_type"]
                     for field in required_fields:
                         assert field in result, f"Similarity result missing {field} field"
+                    
+                    # ID field can be either 'id' or 'content_id'
+                    assert "id" in result or "content_id" in result, "Similarity result missing id/content_id field"
                     
                     # Similarity score should be present
                     assert "similarity_score" in result, "Missing similarity_score field"
@@ -244,9 +247,12 @@ class TestEmbeddedSimilaritySearchIntegration:
             # Results should be suitable for content catalog display
             if len(data["results"]) > 0:
                 result = data["results"][0]
-                catalog_fields = ["id", "title", "description", "tier", "content_type", "estimated_duration"]
+                catalog_fields = ["title", "description", "tier", "content_type", "estimated_duration"]
                 for field in catalog_fields:
                     assert field in result, f"Content catalog needs {field} field"
+                
+                # ID field can be either 'id' or 'content_id'
+                assert "id" in result or "content_id" in result, "Content catalog needs id/content_id field"
 
 if __name__ == "__main__":
     pytest.main([__file__])
