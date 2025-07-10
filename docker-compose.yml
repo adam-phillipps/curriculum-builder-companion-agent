@@ -69,6 +69,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - SECRET_KEY=${SECRET_KEY}
+      - RELOAD=true
+      - SEED_DATABASE=true
+      - BUILD_DOCS=false
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,7 +81,8 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
-    command: sh -c "python scripts/migrate.py && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload"
+    entrypoint: ["./scripts/entrypoint.sh"]
+    command: ["app"]
 
   # Next.js Frontend
   frontend:

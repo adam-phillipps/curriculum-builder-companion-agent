@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 from src.db.init import initialize_database
 from src.api.routes import content, agents, vector_store, analysis, users, pathway, progress, learning_outcomes
 
@@ -35,6 +37,11 @@ app.include_router(users.router)
 app.include_router(pathway.router)
 app.include_router(progress.router)
 app.include_router(learning_outcomes.router)
+
+# Serve documentation if built
+docs_path = os.path.join(os.path.dirname(__file__), "..", "site")
+if os.path.exists(docs_path):
+    app.mount("/docs", StaticFiles(directory=docs_path, html=True), name="docs")
 
 @app.get("/health")
 async def health_check():

@@ -1,26 +1,32 @@
 # Curriculum Builder Companion Agent
 
-An AI-powered curriculum building and analysis platform that helps educators create, manage, and optimize learning content using advanced agentic workflows.
+> **For Product Documentation**: Visit [/docs](http://localhost:8001/docs) when running the application
+> 
+> **For API Documentation**: Visit [/docs](http://localhost:8001/docs) → API Reference
 
-## 🎯 Overview
+An AI-powered curriculum building and analysis platform built with FastAPI, PostgreSQL, ChromaDB, and Next.js. This README is for **developers and contributors**.
 
-This platform enables:
-- **Builders** to efficiently create and manage learning content with AI assistance
-- **Learners** to discover optimal learning pathways based on their goals
-- **Administrators** to analyze content gaps, costs, and learning effectiveness
+## 🏗️ Technical Overview
 
-### Key Features
+This platform provides:
+- **Agentic AI workflows** for content processing and metadata extraction
+- **Vector similarity search** for learning outcomes and content discovery  
+- **Real-time progress tracking** with comprehension vs completion metrics
+- **Interactive learning graphs** with D3.js visualization and gap analysis
+- **Role-based interfaces** for learners, builders, architects, and admins
 
-- 🤖 **Agentic Workflows** - Multi-step AI processing with human-in-the-loop review
-- 📊 **Metadata Extraction** - Automatic classification of difficulty, personas, and learning objectives
-- 🔍 **Embedded Similarity Search** - Integrated similarity detection in content builder and catalog
-- 💰 **Cost Estimation** - Accurate resource cost calculations for learning pathways
-- 🎯 **Dynamic Model Selection** - Support for OpenAI, Anthropic, and other LLM providers
-- 📈 **Analytics & Insights** - Content coverage analysis and learning pathway optimization
-- 📚 **Content Viewer** - Full-screen content reading experience for learners
-- 🏗️ **Role-Based Interface** - Separate experiences for learners, builders, architects, and admins
-- 🔄 **Database Migrations** - Proper Alembic-based schema management
-- 🧪 **Organized Test Suite** - Separated unit and integration tests for efficient development
+### Technical Features
+
+- 🤖 **LangGraph Workflows** - Multi-step AI processing with state management
+- 🔍 **ChromaDB Integration** - Vector similarity search with metadata filtering
+- 📊 **Async SQLAlchemy** - PostgreSQL with proper connection pooling
+- 🎯 **Pydantic Validation** - Type-safe API contracts and data models
+- 📈 **D3.js Visualizations** - Interactive learning graphs with pan/zoom
+- 🔄 **Alembic Migrations** - Database schema version control
+- 🧪 **Pytest Test Suite** - 283 tests with unit/integration separation
+- 🐳 **Docker Compose** - Full development environment
+- ⚡ **Redis Caching** - Session management and pathway caching
+- 🔒 **AGPL-3.0 License** - Prevents commercial exploitation
 
 ## 🏗️ Architecture
 
@@ -595,7 +601,35 @@ Structured logging with:
 
 ## 📄 License
 
-[License information to be added]
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+### Why AGPL-3.0?
+
+We chose AGPL-3.0 to ensure this educational platform remains:
+- **Open Source**: Source code is always available
+- **Non-Profit Friendly**: Prevents commercial exploitation and white-labeling
+- **Community Driven**: Modifications must be shared back to the community
+- **Network Copyleft**: Even web service deployments must provide source code
+
+### What This Means
+
+✅ **You CAN**:
+- Use this software for educational purposes
+- Modify and improve the code
+- Deploy it for your organization or students
+- Contribute back to the project
+
+❌ **You CANNOT**:
+- Create proprietary versions or white-label products
+- Charge money for access without providing source code
+- Use this as the basis for commercial educational platforms
+- Hide modifications when running as a web service
+
+### Commercial Use
+
+If you need to use this software commercially or want different licensing terms, please contact the maintainers to discuss dual licensing options.
+
+See the [LICENSE](LICENSE) file for the complete license text.
 
 ## 🆘 Support
 
@@ -607,3 +641,21 @@ For questions and support:
 ---
 
 **Built with ❤️ for efficient learning and curriculum development**
+
+---
+
+## 🤝 Contributing to Open Education
+
+This project is committed to keeping educational technology open, accessible, and community-driven. By contributing, you help ensure that quality educational tools remain free for educators and learners worldwide.
+
+### Copyright Notice
+
+Copyright (C) 2024-2025 Curriculum Builder Contributors
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+### Source Code Availability
+
+As required by AGPL-3.0, if you run a modified version of this software as a web service, you must provide users with access to the complete source code of your version. This ensures the educational community benefits from all improvements and modifications.
