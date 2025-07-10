@@ -85,6 +85,17 @@ class UserSignInRequest(BaseModel):
     """Schema for simple user sign-in."""
     user_id: int = Field(..., description="User ID to sign in as")
 
+class UserSignInByIdentifierRequest(BaseModel):
+    """Schema for sign-in by email or name."""
+    identifier: str = Field(..., description="Email, name, or partial match to find user")
+
+class UserSearchRequest(BaseModel):
+    """Schema for user search parameters."""
+    q: Optional[str] = Field(None, description="Search query for name or email")
+    role: Optional[str] = Field(None, description="Filter by user role")
+    skip: int = Field(0, ge=0, description="Number of records to skip")
+    limit: int = Field(100, ge=1, le=1000, description="Maximum number of records to return")
+
 class UserSignInResponse(BaseModel):
     """Schema for sign-in response."""
     user: UserResponse

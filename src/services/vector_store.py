@@ -21,6 +21,7 @@ class VectorStoreService:
         self._client = None
         self._approved_collection = None
         self._draft_collection = None
+        self._outcomes_collection = None
     
     @property
     def client(self):
@@ -62,6 +63,13 @@ class VectorStoreService:
         if self._draft_collection is None:
             self._draft_collection = self._get_or_create_collection("draft_content")
         return self._draft_collection
+    
+    @property
+    def outcomes_collection(self):
+        """Lazy initialization of learning outcomes collection."""
+        if self._outcomes_collection is None:
+            self._outcomes_collection = self._get_or_create_collection("learning_outcomes")
+        return self._outcomes_collection
     
     def _get_or_create_collection(self, name: str):
         """Get or create a ChromaDB collection."""
@@ -216,15 +224,116 @@ class VectorStoreService:
         # Implementation depends on specific workflow requirements
         pass
     
+    def add_learning_outcome(
+        self,
+        outcome_id: int,
+        name: str,
+        description: str,
+        domain: str,
+        difficulty_level: str,
+        tags: List[str] = None
+    ) -> str:
+        """Add learning outcome to vector store."""
+        
+        # Generate vector ID
+        vector_id = f"outcome_{outcome_id}"
+        
+        # Prepare document for embedding
+        tags_text = " ".join(tags) if tags else ""
+        document = f"Name: {name}\nDescription: {description}\nDomain: {domain}\nTags: {tags_text}"
+        
+        # Prepare metadata (ChromaDB only accepts str, int, float, bool)
+        metadata = {
+            "outcome_id": outcome_id,
+            "name": name,
+            "description": description or "",
+            "domain": domain,
+            "difficulty_level": difficulty_level,
+            "tags_str": ",".join(tags) if tags else ""  # Convert list to comma-separated string
+        }
+        
+        # Add to ChromaDB
+        try:
+            self.outcomes_collection.add(
+                documents=[document],
+                metadatas=[metadata],
+                ids=[vector_id]
+            )
+        except Exception as e:
+            if "already exists" in str(e).lower():
+                # Update existing entry
+                self.outcomes_collection.update(
+                    documents=[document],
+                    metadatas=[metadata],
+                    ids=[vector_id]
+                )
+            else:
+                raise
+        
+        return vector_id
+    
+    def find_similar_outcomes(
+        self,
+        query_text: str,
+        max_results: int = 10,
+        domain_filter: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Find similar learning outcomes using vector similarity."""
+        
+        # Build where clause for domain filtering
+        where_clause = None
+        if domain_filter:
+            where_clause = {"domain": domain_filter}
+        
+        try:
+            # Query ChromaDB
+            results = self.outcomes_collection.query(
+                query_texts=[query_text],
+                n_results=max_results,
+                where=where_clause
+            )
+            
+            # Process results
+            similar_outcomes = []
+            if results["documents"] and results["documents"][0]:
+                for i, (doc, metadata, distance) in enumerate(zip(
+                    results["documents"][0],
+                    results["metadatas"][0], 
+                    results["distances"][0]
+                )):
+                    # Convert distance to similarity score
+                    similarity_score = max(0, 1 / (1 + distance))
+                    
+                    outcome_data = {
+                        "outcome_id": metadata["outcome_id"],
+                        "name": metadata["name"],
+                        "description": metadata["description"],
+                        "domain": metadata["domain"],
+                        "difficulty_level": metadata["difficulty_level"],
+                        "tags": metadata["tags_str"].split(",") if metadata["tags_str"] else [],
+                        "similarity_score": round(similarity_score, 3)
+                    }
+                    similar_outcomes.append(outcome_data)
+            
+            # Sort by similarity score
+            similar_outcomes.sort(key=lambda x: x["similarity_score"], reverse=True)
+            return similar_outcomes
+            
+        except Exception as e:
+            print(f"Error searching similar outcomes: {e}")
+            return []
+    
     def get_content_stats(self) -> Dict[str, Any]:
         """Get statistics about stored content."""
         try:
             approved_count = self.approved_collection.count()
             draft_count = self.draft_collection.count()
+            outcomes_count = self.outcomes_collection.count()
             
             return {
                 "approved_content_count": approved_count,
                 "draft_content_count": draft_count,
+                "learning_outcomes_count": outcomes_count,
                 "total_content_count": approved_count + draft_count
             }
         except Exception as e:

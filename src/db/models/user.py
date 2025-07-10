@@ -35,9 +35,10 @@ class LearnerProfile(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Learning goals and objectives
-    learning_goals = Column(JSON, nullable=True)  # List of goal objects
+    learning_goals = Column(JSON, nullable=True)  # DEPRECATED: List of goal objects (kept for backward compatibility)
     target_outcomes = Column(JSON, nullable=True)  # List of desired outcomes
     current_pathway_id = Column(Integer, ForeignKey("learning_pathways.id"), nullable=True)
+    primary_learning_outcome_id = Column(Integer, ForeignKey("learning_outcomes.id"), nullable=True)
     
     # Skill assessment data
     skill_assessment = Column(JSON, nullable=True)  # Assessment results
@@ -53,6 +54,7 @@ class LearnerProfile(Base):
     # Relationships
     user = relationship("User", back_populates="learner_profiles")
     current_pathway = relationship("LearningPathway", foreign_keys=[current_pathway_id])
+    primary_learning_outcome = relationship("LearningOutcome", back_populates="learner_profiles")
 
 class UserContentProgress(Base):
     """Track user progress through learning content."""
@@ -64,6 +66,7 @@ class UserContentProgress(Base):
     
     status = Column(String(20), nullable=False, default="not_started")  # not_started, in_progress, completed, skipped
     progress_percentage = Column(Integer, default=0)  # 0-100
+    comprehension_percentage = Column(Float, nullable=True, default=0.0)  # 0-100 self-assessed comprehension
     
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)

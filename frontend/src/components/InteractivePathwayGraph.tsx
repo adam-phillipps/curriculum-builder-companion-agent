@@ -12,6 +12,11 @@ interface PathwayNode {
   status: string;
   name: string;
   description: string;
+  learning_outcomes?: string[];
+  prerequisites?: number[];
+  domain?: string;
+  difficulty_level?: string;
+  comprehension_percentage?: number;
 }
 
 interface ChainImpact {
@@ -32,8 +37,14 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
     showCompleted: true,
     showInProgress: true,
     showNotStarted: true,
-    selectedOutcomes: [] as string[]
+    selectedOutcomes: [] as string[],
+    selectedDomain: '',
+    selectedDifficulty: '',
+    rootNodeId: null as string | null
   });
+  const [layoutMode, setLayoutMode] = useState<'hierarchical' | 'centered'>('hierarchical');
+  const [availableDomains, setAvailableDomains] = useState<string[]>([]);
+  const [availableDifficulties, setAvailableDifficulties] = useState<string[]>([]);
   const [availableOutcomes, setAvailableOutcomes] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -82,7 +93,7 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
         6: { prereqs: [5], outcomes: ['Neural Networks Mastery'] }
       };
       
-      // Convert user progress to pathway nodes with tree structure
+      // Convert user progress to pathway nodes with enhanced metadata
       const mockNodes = userProgress.map((progress: any) => {
         const contentItem = allContent.find((c: any) => c.id === progress.content_id);
         const treeInfo = treeStructure[progress.content_id as keyof typeof treeStructure];
@@ -97,9 +108,22 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
           name: contentItem?.title || `Learning Item ${progress.content_id}`,
           description: `Progress: ${progress.progress_percentage}% - ${progress.time_spent_minutes} minutes`,
           learning_outcomes: outcomes,
-          prerequisites: treeInfo?.prereqs || []
+          prerequisites: treeInfo?.prereqs || [],
+          domain: contentItem?.tier || 'general',
+          difficulty_level: contentItem?.tier || 'intermediate',
+          comprehension_percentage: progress.comprehension_percentage || 0
         };
       });
+      
+      // Extract domains and difficulties for filters
+      const domains = new Set<string>();
+      const difficulties = new Set<string>();
+      mockNodes.forEach(node => {
+        if (node.domain) domains.add(node.domain);
+        if (node.difficulty_level) difficulties.add(node.difficulty_level);
+      });
+      setAvailableDomains(Array.from(domains));
+      setAvailableDifficulties(Array.from(difficulties));
       
       // Extract all unique learning outcomes for filter
       const allOutcomes = new Set<string>();
@@ -145,17 +169,19 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
   };
 
   const getFilteredNodes = () => {
-    return nodes.filter(node => {
+    let filteredNodes = nodes.filter(node => {
+      // Status filters
       if (!filters.showCompleted && node.status === 'completed') return false;
       if (!filters.showInProgress && node.status === 'in_progress') return false;
       if (!filters.showNotStarted && node.status === 'not_started') return false;
       
-      const importance = chainImpacts[node.id] || 0;
-      if (importance < filters.minImpact) return false;
+      // Domain filter
+      if (filters.selectedDomain && node.domain !== filters.selectedDomain) return false;
       
-      if (filters.showHighImpact && importance < 0.7) return false;
+      // Difficulty filter
+      if (filters.selectedDifficulty && node.difficulty_level !== filters.selectedDifficulty) return false;
       
-      // Filter by selected learning outcomes
+      // Learning outcomes filter
       if (filters.selectedOutcomes.length > 0) {
         const hasSelectedOutcome = node.learning_outcomes?.some((outcome: string) => 
           filters.selectedOutcomes.includes(outcome)
@@ -165,6 +191,42 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
       
       return true;
     });
+    
+    // Root node filtering - show only nodes that lead to the selected root
+    if (filters.rootNodeId) {
+      const rootNode = filteredNodes.find(n => n.id === filters.rootNodeId);
+      if (rootNode) {
+        const pathToRoot = getPathToNode(rootNode, filteredNodes);
+        filteredNodes = filteredNodes.filter(node => pathToRoot.includes(node.id));
+      }
+    }
+    
+    return filteredNodes;
+  };
+  
+  // Get all nodes that lead to a specific target node
+  const getPathToNode = (targetNode: PathwayNode, allNodes: PathwayNode[]): string[] => {
+    const visited = new Set<string>();
+    const path: string[] = [];
+    
+    const traverse = (node: PathwayNode) => {
+      if (visited.has(node.id)) return;
+      visited.add(node.id);
+      path.push(node.id);
+      
+      // Add all prerequisite nodes
+      if (node.prerequisites) {
+        node.prerequisites.forEach(prereqId => {
+          const prereqNode = allNodes.find(n => n.content_id === prereqId);
+          if (prereqNode) {
+            traverse(prereqNode);
+          }
+        });
+      }
+    };
+    
+    traverse(targetNode);
+    return path;
   };
 
   const renderGraph = () => {
@@ -212,17 +274,37 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
     
     console.log('Generated links:', links.length);
 
-    // Force simulation with horizontal tree layout (root on left)
-    const simulation = d3.forceSimulation(filteredNodes as any)
-      .force('link', d3.forceLink(links).id((d: any) => d.id).strength(0.5).distance(120))
-      .force('charge', d3.forceManyBody().strength(-400))
-      .force('x', d3.forceX().x((d: any) => {
-        // Position nodes horizontally: leaves on right, root on left
-        const depth = getNodeDepth(d, filteredNodes, links);
-        return 100 + (depth * 120); // Root nodes on left
-      }).strength(0.9))
-      .force('y', d3.forceY(height / 2).strength(0.2))
-      .force('collision', d3.forceCollide().radius((d: any) => getNodeRadius(d) + 20));
+    // Create force simulation based on layout mode
+    let simulation;
+    
+    if (layoutMode === 'hierarchical') {
+      // Hierarchical layout with root at top
+      simulation = d3.forceSimulation(filteredNodes as any)
+        .force('link', d3.forceLink(links).id((d: any) => d.id).strength(0.5).distance(120))
+        .force('charge', d3.forceManyBody().strength(-400))
+        .force('x', d3.forceX(width / 2).strength(0.1))
+        .force('y', d3.forceY().y((d: any) => {
+          const depth = getNodeDepth(d, filteredNodes, links);
+          return 80 + (depth * 100); // Root at top, dependencies below
+        }).strength(0.8))
+        .force('collision', d3.forceCollide().radius((d: any) => getNodeRadius(d) + 20));
+    } else {
+      // Centered layout with root in middle
+      const rootNode = filters.rootNodeId ? filteredNodes.find(n => n.id === filters.rootNodeId) : null;
+      
+      simulation = d3.forceSimulation(filteredNodes as any)
+        .force('link', d3.forceLink(links).id((d: any) => d.id).strength(0.3).distance(150))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius((d: any) => getNodeRadius(d) + 25));
+        
+      // If there's a root node, pin it to center
+      if (rootNode) {
+        simulation.force('root', d3.forceRadial(0, width / 2, height / 2).strength((d: any) => 
+          d.id === filters.rootNodeId ? 1.0 : 0.1
+        ));
+      }
+    }
 
     // Links with arrowheads for direction
     svg.append('defs').append('marker')
@@ -289,15 +371,89 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
         hideTooltip();
       });
 
+    // Add zoom and pan behavior
+    const zoom = d3.zoom()
+      .scaleExtent([0.1, 4])
+      .on('zoom', (event) => {
+        svg.select('g.graph-container')
+          .attr('transform', event.transform);
+      });
+    
+    svg.call(zoom as any);
+    
+    // Create container for graph elements
+    const graphContainer = svg.append('g').attr('class', 'graph-container');
+    
+    // Move link and node elements to container
+    linkElements.remove();
+    nodeElements.remove();
+    
+    const linkElementsInContainer = graphContainer.append('g')
+      .selectAll('line')
+      .data(links)
+      .enter()
+      .append('line')
+      .attr('stroke', '#94A3B8')
+      .attr('stroke-width', 2)
+      .attr('marker-end', 'url(#arrowhead)')
+      .attr('opacity', (d: any) => {
+        if (!hoveredNode) return 0.3;
+        return (d.source.id === hoveredNode || d.target.id === hoveredNode) ? 0.8 : 0.1;
+      });
+    
+    const nodeElementsInContainer = graphContainer.append('g')
+      .selectAll('g')
+      .data(filteredNodes)
+      .enter()
+      .append('g')
+      .style('cursor', 'pointer');
+    
+    // Recreate node circles and labels
+    nodeElementsInContainer.append('circle')
+      .attr('r', (d: any) => getNodeRadius(d, d.id === hoveredNode))
+      .attr('fill', (d: any) => getNodeColor(d))
+      .attr('stroke', (d: any) => d.id === filters.rootNodeId ? '#DC2626' : '#E5E7EB')
+      .attr('stroke-width', (d: any) => d.id === filters.rootNodeId ? 4 : 2)
+      .attr('opacity', (d: any) => {
+        if (!hoveredNode) return 0.8;
+        return d.id === hoveredNode ? 1.0 : 0.4;
+      })
+      .on('click', (event, d: any) => {
+        // Set as new root node
+        setFilters(prev => ({
+          ...prev,
+          rootNodeId: prev.rootNodeId === d.id ? null : d.id
+        }));
+      });
+    
+    nodeElementsInContainer.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dy', '0.3em')
+      .attr('font-size', '11px')
+      .attr('font-weight', 'bold')
+      .attr('fill', 'white')
+      .text((d: any) => `${Math.round(d.completion)}%`);
+    
+    // Hover interactions
+    nodeElementsInContainer
+      .on('mouseenter', (event, d: any) => {
+        setHoveredNode(d.id);
+        showTooltip(event, d);
+      })
+      .on('mouseleave', () => {
+        setHoveredNode(null);
+        hideTooltip();
+      });
+    
     // Update on tick
     simulation.on('tick', () => {
-      linkElements
+      linkElementsInContainer
         .attr('x1', (d: any) => d.source.x)
         .attr('y1', (d: any) => d.source.y)
         .attr('x2', (d: any) => d.target.x)
         .attr('y2', (d: any) => d.target.y);
 
-      nodeElements
+      nodeElementsInContainer
         .attr('transform', (d: any) => `translate(${d.x},${d.y})`);
     });
   };
@@ -334,6 +490,33 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
   const hideTooltip = () => {
     d3.selectAll('.pathway-tooltip').remove();
   };
+  
+  // Cleanup tooltips when component unmounts or user navigates away
+  useEffect(() => {
+    const cleanup = () => {
+      d3.selectAll('.pathway-tooltip').remove();
+      setHoveredNode(null);
+    };
+    
+    // Cleanup on page visibility change (tab switch)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        cleanup();
+      }
+    };
+    
+    // Cleanup on mouse leave from entire component
+    const handleMouseLeave = () => {
+      cleanup();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      cleanup();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   /**
    * Calculate the depth of a node in the prerequisite tree.
@@ -371,80 +554,176 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">Learning Pathway Tree</h3>
         
-        <div className="flex items-center space-x-4">
-          <div className="flex space-x-3 text-sm">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={filters.showCompleted}
-                onChange={(e) => setFilters({...filters, showCompleted: e.target.checked})}
-                className="mr-1"
-              />
-              Completed
-            </label>
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={filters.showInProgress}
-                onChange={(e) => setFilters({...filters, showInProgress: e.target.checked})}
-                className="mr-1"
-              />
-              In Progress
-            </label>
-          </div>
-          
-          <div className="relative">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
-            >
-              Learning Outcomes ({filters.selectedOutcomes.length})
-            </button>
-            
-            {showFilters && (
-              <div className="absolute top-8 left-0 bg-white border rounded-lg shadow-lg p-4 z-10 min-w-64">
-                <h4 className="font-medium mb-2">Filter by Learning Outcomes</h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {availableOutcomes.map(outcome => (
-                    <label key={outcome} className="flex items-center text-sm">
-                      <input
-                        type="checkbox"
-                        checked={filters.selectedOutcomes.includes(outcome)}
-                        onChange={(e) => {
-                          const newOutcomes = e.target.checked
-                            ? [...filters.selectedOutcomes, outcome]
-                            : filters.selectedOutcomes.filter(o => o !== outcome);
-                          setFilters({...filters, selectedOutcomes: newOutcomes});
-                        }}
-                        className="mr-2"
-                      />
-                      {outcome}
-                    </label>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setShowFilters(false)}
-                  className="mt-2 px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
-                >
-                  Close
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+        >
+          <span>🔍</span>
+          <span>Filters & Layout</span>
+          {(filters.selectedOutcomes.length > 0 || filters.selectedDomain || filters.rootNodeId) && (
+            <span className="bg-blue-500 text-xs px-2 py-0.5 rounded-full">
+              {[filters.selectedOutcomes.length, filters.selectedDomain ? 1 : 0, filters.rootNodeId ? 1 : 0].reduce((a, b) => a + b, 0)}
+            </span>
+          )}
+        </button>
       </div>
 
+      {/* Filter Panel */}
+      {showFilters && (
+        <div className="mb-4 bg-white border rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-gray-900">Graph Filters & Layout</h4>
+            <button
+              onClick={() => setShowFilters(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Layout Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Layout</label>
+              <select
+                value={layoutMode}
+                onChange={(e) => setLayoutMode(e.target.value as 'hierarchical' | 'centered')}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="hierarchical">Hierarchical</option>
+                <option value="centered">Centered</option>
+              </select>
+            </div>
+            
+            {/* Domain Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Domain</label>
+              <select
+                value={filters.selectedDomain}
+                onChange={(e) => setFilters({...filters, selectedDomain: e.target.value})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Domains</option>
+                {availableDomains.map(domain => (
+                  <option key={domain} value={domain}>{domain}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Root Node Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Focus on Content</label>
+              <select
+                value={filters.rootNodeId || ''}
+                onChange={(e) => setFilters({...filters, rootNodeId: e.target.value || null})}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Content</option>
+                {nodes.map(node => (
+                  <option key={node.id} value={node.id}>{node.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Status Filters */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <div className="space-y-2">
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={filters.showCompleted}
+                    onChange={(e) => setFilters({...filters, showCompleted: e.target.checked})}
+                    className="mr-2 rounded"
+                  />
+                  Completed
+                </label>
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={filters.showInProgress}
+                    onChange={(e) => setFilters({...filters, showInProgress: e.target.checked})}
+                    className="mr-2 rounded"
+                  />
+                  In Progress
+                </label>
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={filters.showNotStarted}
+                    onChange={(e) => setFilters({...filters, showNotStarted: e.target.checked})}
+                    className="mr-2 rounded"
+                  />
+                  Not Started
+                </label>
+              </div>
+            </div>
+            
+            {/* Learning Outcomes */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Learning Outcomes</label>
+              <div className="max-h-32 overflow-y-auto border border-gray-200 rounded-md p-2 bg-gray-50">
+                {availableOutcomes.length > 0 ? (
+                  <div className="space-y-1">
+                    {availableOutcomes.map(outcome => (
+                      <label key={outcome} className="flex items-center text-sm">
+                        <input
+                          type="checkbox"
+                          checked={filters.selectedOutcomes.includes(outcome)}
+                          onChange={(e) => {
+                            const newOutcomes = e.target.checked
+                              ? [...filters.selectedOutcomes, outcome]
+                              : filters.selectedOutcomes.filter(o => o !== outcome);
+                            setFilters({...filters, selectedOutcomes: newOutcomes});
+                          }}
+                          className="mr-2 rounded"
+                        />
+                        {outcome}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No outcomes available</p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Clear Filters */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setFilters({
+                showCompleted: true,
+                showInProgress: true,
+                showNotStarted: true,
+                selectedOutcomes: [],
+                selectedDomain: '',
+                selectedDifficulty: '',
+                rootNodeId: null
+              })}
+              className="text-sm text-gray-600 hover:text-gray-800 underline"
+            >
+              Clear all filters
+            </button>
+          </div>
+        </div>
+      )}
+      
       <svg
         ref={svgRef}
         width="800"
         height="600"
         className="border rounded-lg bg-gray-50"
+        onMouseLeave={() => {
+          setHoveredNode(null);
+          hideTooltip();
+        }}
       />
 
       <div className="mt-4 text-xs text-gray-600 space-y-1">
-        <p><strong>Tree Structure:</strong> Learning pathway flows from foundational concepts (right) to final goal (left).</p>
-        <p><strong>Prerequisites:</strong> Arrows show prerequisite → dependent relationships.</p>
-        <p><strong>Interaction:</strong> Hover nodes to see details and connections.</p>
+        <p><strong>Layout:</strong> {layoutMode === 'hierarchical' ? 'Hierarchical view with root at top' : 'Centered view with selected root in middle'}</p>
+        <p><strong>Interaction:</strong> Click nodes to set as root • Hover for details • Scroll to zoom • Drag to pan</p>
+        <p><strong>Root Node:</strong> {filters.rootNodeId ? nodes.find(n => n.id === filters.rootNodeId)?.name || 'Selected' : 'None selected'} (red border)</p>
       </div>
     </div>
   );

@@ -236,3 +236,79 @@ async def test_get_user_content_progress_endpoint(db_session: AsyncSession):
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)  # Should return empty list initially
+
+@pytest.mark.asyncio
+async def test_search_users_endpoint(db_session: AsyncSession):
+    """Test searching users via API."""
+    async def override_get_db():
+        yield db_session
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
+    try:
+        # Create test users
+        await create_user(db_session, UserCreate(first_name="Alice", current_role="learner"))
+        await create_user(db_session, UserCreate(first_name="Bob", current_role="builder"))
+        
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            # Test search by name
+            response = await client.get("/users/search?q=Alice")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) >= 1
+            assert any(user["first_name"] == "Alice" for user in data)
+            
+            # Test search by role
+            response = await client.get("/users/search?role=builder")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) >= 1
+            assert all(user["current_role"] == "builder" for user in data)
+    finally:
+        app.dependency_overrides.clear()
+
+@pytest.mark.asyncio
+async def test_sign_in_by_identifier_endpoint(db_session: AsyncSession):
+    """Test sign-in by identifier via API."""
+    async def override_get_db():
+        yield db_session
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
+    try:
+        import uuid
+        unique_email = f"signin.{uuid.uuid4().hex[:8]}@example.com"
+        
+        # Create a user
+        user = await create_user(db_session, UserCreate(
+            first_name="SignIn",
+            last_name="Test",
+            email=unique_email,
+            current_role="learner"
+        ))
+        
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            # Test sign-in by email
+            response = await client.post("/users/sign-in/by-identifier", 
+                                       json={"identifier": unique_email})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["user"]["id"] == user.id
+            
+            # Test sign-in by name
+            response = await client.post("/users/sign-in/by-identifier", 
+                                       json={"identifier": "SignIn Test"})
+            assert response.status_code == 200
+            data = response.json()
+            assert data["user"]["id"] == user.id
+    finally:
+        app.dependency_overrides.clear()
+
+@pytest.mark.asyncio
+async def test_sign_in_by_identifier_not_found():
+    """Test sign-in by identifier with non-existent user."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        response = await client.post("/users/sign-in/by-identifier", 
+                                   json={"identifier": "NonExistentUser"})
+        assert response.status_code == 404
+        assert "User not found" in response.json()["detail"]

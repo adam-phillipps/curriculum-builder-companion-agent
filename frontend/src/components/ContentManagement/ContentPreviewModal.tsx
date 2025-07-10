@@ -1,10 +1,18 @@
 'use client';
 
 import { X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+
+interface User {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  current_role: string;
+}
 
 interface ContentPreviewModalProps {
   content: {
-    content_id: number;
+    id: number;
     title: string;
     description: string;
     tier: string;
@@ -19,14 +27,114 @@ interface ContentPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   onViewContent: () => void;
+  currentUser?: User | null;
 }
 
 export default function ContentPreviewModal({ 
   content, 
   isOpen, 
   onClose, 
-  onViewContent 
+  onViewContent,
+  currentUser 
 }: ContentPreviewModalProps) {
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [comprehension, setComprehension] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  
+  // Check enrollment status when modal opens
+  useEffect(() => {
+    if (isOpen && currentUser && content.id) {
+      checkEnrollmentStatus();
+    }
+  }, [isOpen, currentUser, content.id]);
+  
+  const checkEnrollmentStatus = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const response = await fetch(`http://localhost:8001/api/v1/progress/${currentUser.id}/${content.id}`);
+      if (response.ok) {
+        const progress = await response.json();
+        setIsEnrolled(true);
+        setComprehension(progress.comprehension_percentage || 0);
+        setIsCompleted(progress.status === 'completed');
+      }
+    } catch (error) {
+      // Not enrolled yet
+      setIsEnrolled(false);
+    }
+  };
+  
+  const handleEnroll = async () => {
+    if (!currentUser) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:8001/api/v1/progress/enroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          content_id: content.id
+        })
+      });
+      
+      if (response.ok) {
+        setIsEnrolled(true);
+        setComprehension(0);
+      }
+    } catch (error) {
+      console.error('Enrollment failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleComprehensionChange = async (value: number) => {
+    if (!currentUser || !isEnrolled) return;
+    
+    setComprehension(value);
+    
+    try {
+      await fetch('http://localhost:8001/api/v1/progress/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          content_id: content.id,
+          comprehension_percentage: value
+        })
+      });
+    } catch (error) {
+      console.error('Failed to update comprehension:', error);
+    }
+  };
+  
+  const handleMarkComplete = async () => {
+    if (!currentUser || !isEnrolled) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:8001/api/v1/progress/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          content_id: content.id,
+          status: 'completed'
+        })
+      });
+      
+      if (response.ok) {
+        setIsCompleted(true);
+      }
+    } catch (error) {
+      console.error('Failed to mark complete:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   if (!isOpen) return null;
 
   const getTierColor = (tier: string) => {
@@ -123,7 +231,7 @@ export default function ContentPreviewModal({
             )}
             <div>
               <span className="font-medium text-gray-900">Content ID:</span>
-              <span className="ml-2 text-gray-700">{content.content_id}</span>
+              <span className="ml-2 text-gray-700">{content.id}</span>
             </div>
           </div>
 
@@ -146,19 +254,75 @@ export default function ContentPreviewModal({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end space-x-3 p-6 border-t bg-gray-50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Go Back
-          </button>
-          <button
-            onClick={onViewContent}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            View Content
-          </button>
+        <div className="p-6 border-t bg-gray-50">
+          {/* Comprehension Slider - Only show if enrolled */}
+          {isEnrolled && currentUser && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                How comfortable are you with this material? ({Math.round(comprehension)}%)
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={comprehension}
+                onChange={(e) => handleComprehensionChange(Number(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>Not comfortable</span>
+                <span>Very comfortable</span>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              {/* Enroll Button - Only show if not enrolled and user is logged in */}
+              {!isEnrolled && currentUser && (
+                <button
+                  onClick={handleEnroll}
+                  disabled={loading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Enrolling...' : 'Enroll'}
+                </button>
+              )}
+              
+              {/* Mark Complete Button - Only show if enrolled but not completed */}
+              {isEnrolled && !isCompleted && currentUser && (
+                <button
+                  onClick={handleMarkComplete}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Updating...' : 'Mark Complete'}
+                </button>
+              )}
+              
+              {/* Completed Status */}
+              {isCompleted && (
+                <span className="px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium">
+                  ✓ Completed
+                </span>
+              )}
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={onViewContent}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                View Content
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

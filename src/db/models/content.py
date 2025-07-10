@@ -31,6 +31,7 @@ class LearningContent(Base, TimestampMixin, MetadataMixin):
     code_title = Column(String, unique=True, nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
+    content_body = Column(Text, nullable=True)  # The actual learning content
 
     content_type = Column(String, nullable=False)
     tier = Column(String, nullable=False)

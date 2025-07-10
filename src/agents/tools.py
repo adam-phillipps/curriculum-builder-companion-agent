@@ -200,6 +200,7 @@ async def _create_learning_content(
         code_title=code_title,
         title=metadata.get("title", "Learning Content"),
         description=metadata.get("description", "Generated learning content"),
+        content_body=raw_content,  # Store the actual learning content
         content_type=metadata.get("content_type", "lesson"),
         tier=metadata.get("tier", "T2"),
         personas=metadata.get("personas", ["developer"]),

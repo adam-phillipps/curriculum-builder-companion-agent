@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     SIMILARITY_THRESHOLD: float = 0.85
     MAX_RETRIES: int = 3
     TIMEOUT_SECONDS: int = 300
+    
+    # Content similarity thresholds for builder warnings
+    CONTENT_SIMILARITY_LOW: float = 0.3
+    CONTENT_SIMILARITY_MEDIUM: float = 0.6
+    CONTENT_SIMILARITY_HIGH: float = 0.8
 
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
     CHUNK_SIZE: int = 1000
