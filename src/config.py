@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
+    
+    # Documentation service configuration
+    DOCS_HOST: str = "localhost"
+    DOCS_PORT: int = 8080
 
     model_config = SettingsConfigDict(
         env_file=".env",
