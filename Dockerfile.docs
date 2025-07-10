@@ -1,0 +1,19 @@
+# Lightweight documentation server
+FROM python:3.11-alpine
+
+WORKDIR /docs
+
+# Install documentation dependencies
+COPY requirements-docs.txt .
+RUN pip install --no-cache-dir -r requirements-docs.txt
+
+# Copy documentation source
+COPY docs/ ./docs/
+COPY mkdocs.yml .
+
+# Build documentation
+RUN mkdocs build
+
+# Serve documentation using built-in server
+EXPOSE 8080
+CMD ["mkdocs", "serve", "--dev-addr=0.0.0.0:8080"]

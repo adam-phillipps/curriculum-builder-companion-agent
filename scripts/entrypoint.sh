@@ -74,17 +74,20 @@ seed_database() {
 
 # Function to build documentation
 build_docs() {
-    if [ "$BUILD_DOCS" = "true" ]; then
-        log_info "Installing documentation dependencies..."
-        pip install -r requirements-docs.txt > /dev/null 2>&1
-        
-        log_info "Building documentation..."
-        mkdocs build > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-            log_success "Documentation built successfully"
-        else
-            log_warn "Documentation build failed (non-critical)"
-        fi
+    log_info "Installing documentation dependencies..."
+    pip install -r requirements-docs.txt
+    if [ $? -ne 0 ]; then
+        log_error "Failed to install documentation dependencies"
+        exit 1
+    fi
+    
+    log_info "Building documentation..."
+    mkdocs build
+    if [ $? -eq 0 ]; then
+        log_success "Documentation built successfully"
+    else
+        log_error "Documentation build failed"
+        exit 1
     fi
 }
 
@@ -164,8 +167,9 @@ case "$1" in
         seed_database
         ;;
     "docs")
-        log_info "Building documentation only..."
-        build_docs
+        log_info "Documentation service not needed in app container"
+        log_info "Use 'docker compose --profile docs up -d docs' instead"
+        exit 0
         ;;
     "test")
         run_tests

@@ -1,6 +1,61 @@
 # version: '3.8'
 
 services:
+  # Documentation Service (lightweight, always running)
+  docs:
+    build:
+      context: .
+      dockerfile: Dockerfile.docs
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docs:/docs/docs:ro
+      - ./mkdocs.yml:/docs/mkdocs.yml:ro
+    profiles:
+      - docs
+
+  # Database Migration (runs once, exits)
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    entrypoint: ["./scripts/entrypoint.sh"]
+    command: ["migrate"]
+    profiles:
+      - migrate
+
+  # Database Seeder (runs once, exits)
+  seeder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    entrypoint: ["./scripts/entrypoint.sh"]
+    command: ["seed"]
+    profiles:
+      - seed
+
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
@@ -47,7 +102,7 @@ services:
       timeout: 10s
       retries: 3
 
-  # FastAPI Application
+  # FastAPI Application (clean, production-ready)
   app:
     build:
       context: .
@@ -69,9 +124,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - SECRET_KEY=${SECRET_KEY}
-      - RELOAD=true
-      - SEED_DATABASE=true
-      - BUILD_DOCS=false
+      - RELOAD=${RELOAD:-true}
+      - DOCS_HOST=${DOCS_HOST:-localhost}
+      - DOCS_PORT=${DOCS_PORT:-8080}
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,7 +137,7 @@ services:
     volumes:
       - .:/app
     entrypoint: ["./scripts/entrypoint.sh"]
-    command: ["app"]
+    command: ["app-minimal"]  # Clean app start, no setup tasks
 
   # Next.js Frontend
   frontend:

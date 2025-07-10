@@ -61,35 +61,38 @@ This platform provides:
 - Docker and Docker Compose
 - OpenAI and/or Anthropic API keys
 - Python 3.11+ (for local development)
+- 8GB+ RAM recommended
 
 ### Setup
 
-1. **Clone the repository**
+1. **Clone and configure**
    ```bash
    git clone <repository-url>
    cd curriculum-builder-companion-agent
-   ```
-
-2. **Configure environment**
-   ```bash
    cp .env.example .env
    # Edit .env with your API keys
    ```
 
-3. **Start the development environment**
+2. **Start development environment**
    ```bash
-   ./scripts/dev-setup.sh
+   # Full setup (migrations + seeding + app)
+   docker-compose up -d
+   
+   # Or use helper commands
+   ./scripts/dev-commands.sh start
    ```
 
-4. **Verify services are running**
+3. **Verify services**
    ```bash
    docker-compose ps
+   curl http://localhost:8001/health
    ```
 
 ### Services
 
-- **API Documentation**: http://localhost:8001/docs
 - **FastAPI App**: http://localhost:8001
+- **API Documentation**: http://localhost:8001/api/docs
+- **Product Documentation**: http://localhost:8001/docs (when built)
 - **PostgreSQL**: localhost:5432
 - **Redis**: localhost:6379
 - **ChromaDB**: http://localhost:8000
@@ -143,46 +146,30 @@ curl "http://localhost:8001/api/v1/content?tier=T2&persona=developer&limit=10"
 
 ## 🧪 Testing
 
-### Test Suite Organization
-
-The test suite is organized into two main categories for efficient development:
-
-```
-tests/
-├── unit/                    # Pure unit tests (no external dependencies)
-│   ├── db/                  # Database model and CRUD tests
-│   ├── services/            # Service layer tests
-│   └── [test files]         # Configuration, math, and logic tests
-├── integration/             # Integration tests (external services)
-│   ├── agents/              # LLM integration tests
-│   ├── api/                 # API endpoint tests
-│   ├── frontend/            # Frontend integration tests
-│   ├── services/            # External service tests (ChromaDB, etc.)
-│   └── workflows/           # End-to-end workflow tests
-└── conftest.py             # Shared test fixtures
-```
-
 ### Test Commands
 
 ```bash
-# Run all tests (219 tests, ~4 minutes)
-docker compose exec app pytest
+# Run all tests (283 tests)
+docker-compose run --rm app test
 
-# Run only unit tests (104 tests, ~30 seconds)
-docker compose exec app pytest tests/unit/
+# Run only unit tests (fast)
+docker-compose run --rm -e TEST_TYPE=unit app test
 
-# Run only integration tests (123 tests, ~3 minutes)
-docker compose exec app pytest tests/integration/
+# Run only integration tests
+docker-compose run --rm -e TEST_TYPE=integration app test
 
-# Skip LLM tests (for faster development)
-docker compose exec app pytest -m "not llm"
-
-# Run with coverage
-docker compose exec app pytest --cov=src
-
-# Run specific test file
-docker compose exec app pytest tests/unit/test_config.py -v
+# Or use helper commands
+./scripts/dev-commands.sh test
+./scripts/dev-commands.sh test-unit
+./scripts/dev-commands.sh test-integration
 ```
+
+### Test Organization
+
+- **Unit Tests** (`tests/unit/`): Mock external dependencies, fast execution
+- **Integration Tests** (`tests/integration/`): Real services, comprehensive workflows
+- **283 total tests** with >90% coverage
+- **Separated concerns**: Database, API, agents, frontend, services
 
 ### Test Strategy
 
@@ -200,32 +187,30 @@ docker compose exec app pytest tests/unit/test_config.py -v
 
 ## 🛠️ Development
 
-### New Features Added
+### Container Commands
 
-#### Embedded Similarity Search
-- **Content Builder**: Check for similar content before submission with color-coded warnings
-- **Content Catalog**: Text-based similarity search with filtering capabilities
-- **Removed**: Standalone similarity search tab (functionality moved to where it's needed)
+```bash
+# Application management
+docker-compose run --rm app app-minimal    # App only
+docker-compose run --rm app migrate        # Run migrations
+docker-compose run --rm app seed           # Seed database
+docker-compose run --rm app docs           # Build documentation
 
-#### Content Viewing System
-- **Content Viewer**: Full-screen reading experience for learners
-- **Content Body Storage**: Actual learning content stored in database
-- **API Integration**: Proper content retrieval endpoints
+# Development helpers
+./scripts/dev-commands.sh start            # Full environment
+./scripts/dev-commands.sh shell            # Interactive shell
+./scripts/dev-commands.sh logs             # View logs
+./scripts/dev-commands.sh clean            # Clean containers
+```
 
-#### Role-Based Interface
-- **Learners**: Content catalog with similarity search for discovery
-- **Builders**: Content creation form with embedded similarity checking
-- **Architects & Admins**: Specialized interfaces (coming soon)
+### Key Features
 
-#### Database Improvements
-- **Alembic Migrations**: Proper schema version control
-- **Content Body Field**: Storage for actual learning content
-- **Enhanced Metadata**: Author, sources, AI assistance tracking
-
-#### Test Suite Reorganization
-- **Unit/Integration Separation**: Efficient test execution
-- **Service Grouping**: Tests organized by functionality
-- **Mock Strategy**: Proper isolation of external dependencies
+- **Learning Outcomes**: AI-powered goal discovery with similarity search
+- **Progress Tracking**: Dual metrics (completion vs comprehension)
+- **Interactive Graphs**: D3.js visualizations with gap analysis
+- **Content Builder**: Embedded similarity search and AI assistance
+- **Vector Search**: ChromaDB integration for semantic matching
+- **Agentic Workflows**: LangGraph-based content processing
 
 ### Project Structure
 
@@ -234,287 +219,148 @@ src/
 ├── agents/           # LangGraph workflows and AI agents
 ├── api/             # FastAPI routes and dependencies
 ├── db/              # Database models, CRUD operations
+├── services/        # Business logic and external integrations
 ├── config.py        # Configuration and constants
 └── main.py          # FastAPI application entry point
 
-tests/
-├── test_db/         # Database and CRUD tests
-└── conftest.py      # Test configuration
+docs/                # MkDocs documentation
+├── product/         # User-facing documentation
+├── technical/       # Developer documentation
+└── tutorials/       # Guides and examples
 
 scripts/
-├── dev-setup.sh     # Development environment setup
-├── generate_pathway_data.py  # Generate test pathway data
-├── generate_sankey_data.py   # Generate Sankey visualization data
-├── generate_content_progress.py  # Generate user content progress data
-├── init_db.py       # Initialize database
-├── migrate.py       # Run database migrations
-└── run-tests.sh     # Run test suite
+├── entrypoint.sh    # Container entrypoint with command handling
+├── dev-commands.sh  # Development helper commands
+├── migrate.py       # Database migrations
+└── generate_*.py    # Test data generation
+
+tests/
+├── unit/            # Unit tests (mocked dependencies)
+├── integration/     # Integration tests (real services)
+└── conftest.py      # Shared test fixtures
 ```
 
-## 📜 Scripts Usage
+## 📜 Database Management
 
-### Database Management
+### Migrations
 
-**Run Database Migrations** (Recommended)
 ```bash
-docker compose exec app python scripts/migrate.py
-```
-Runs Alembic migrations to update database schema. Always use this for schema changes.
+# Run migrations (recommended)
+docker-compose run --rm app migrate
 
-**Initialize Database** (Development Only)
-```bash
-docker compose exec app python scripts/init_db.py
-```
-Creates all tables from scratch. Only use for fresh development setup.
+# Create new migration
+docker-compose exec app alembic revision -m "description"
 
-**Create New Migration**
-```bash
-docker compose exec app alembic revision -m "description_of_changes"
-```
-Generates a new Alembic migration file for schema changes.
-
-### Test Data Generation
-
-**Generate Simple Linear Pathway**
-```bash
-docker compose exec app python scripts/generate_pathway_data.py --type simple
+# View migration history
+docker-compose exec app alembic history
 ```
 
-**Generate Complex Multi-Branch Pathway**
-```bash
-docker compose exec app python scripts/generate_pathway_data.py --type complex
-```
-
-**Generate Sankey Visualization Data**
-```bash
-docker compose exec app python scripts/generate_sankey_data.py
-```
-
-**Generate User Content Progress Data**
-```bash
-# Generate progress for default user (ID=1) and content IDs 101-106
-docker compose exec app python scripts/generate_content_progress.py
-
-# Generate progress for specific user
-docker compose exec app python scripts/generate_content_progress.py --user-id 2
-
-# Generate progress for specific content IDs
-docker compose exec app python scripts/generate_content_progress.py --content-ids 101 102 103
-
-# Generate progress for specific user and content IDs
-docker compose exec app python scripts/generate_content_progress.py --user-id 2 --content-ids 101 102
-```
-
-### Testing
-
-**Run All Tests**
-```bash
-docker compose exec app python scripts/run-tests.sh
-```
-
-**Run Specific Test File**
-```bash
-docker compose exec app pytest tests/test_db/test_crud.py -v
-```
-
-**Run Tests with Coverage**
-```bash
-docker compose exec app pytest --cov=src
-```
-
-### Development Setup
-
-**Complete Development Environment Setup**
-```bash
-./scripts/dev-setup.sh
-```
-Sets up the entire development environment including:
-- Docker service health checks
-- Environment file creation from template
-- Service startup and verification
-- Database migration execution
-- Service endpoint information
-
-### Pathway Data Generation Details
-
-The `generate_pathway_data.py` script creates realistic learning pathway data for testing:
-
-**Simple Pathway** (`--type simple`):
-- Creates 4 learning content items in linear progression
-- Prerequisites: 1→2→3→4
-- Good for basic testing and simple visualizations
-- Generates skill assessments and user progress data
-
-**Complex Pathway** (`--type complex`):
-- Creates 6 learning content items in tree structure
-- Multi-branch flow: Math + Programming → ML Theory → Neural Networks
-- Tree structure with proper prerequisite relationships
-- Learning objectives: Mathematics Fundamentals, Programming Fundamentals, ML Theory, Neural Networks Mastery
-- Generates realistic progress data with mixed completion states
-
-**Generated Data Includes**:
-- Learning pathway with target persona and duration
-- Pathway items with weights, prerequisites, and completion status
-- User content progress with realistic percentages and time spent
-- Skill assessments across multiple categories
-- Learning objectives and content relationships
-
-### Key Components
-
-- **Agents** (`src/agents/`): LangGraph-based workflows for content processing
-- **Database** (`src/db/`): SQLAlchemy models and async CRUD operations
-- **API Routes** (`src/api/`): FastAPI endpoints with dependency injection
-- **Vector Store** (`src/vector_store/`): ChromaDB integration for similarity search
-- **Configuration** (`src/config.py`): Environment-based settings and constants
-- **Scripts** (`scripts/`): Database management and test data generation utilities
-- **Frontend** (`frontend/`): Next.js application with role-based interfaces
-- **Migrations** (`alembic/`): Database schema version control
-
-### Adding New Features
-
-1. **Database Changes**: 
-   - Update models in `src/db/models/`
-   - Create Alembic migration: `alembic revision -m "description"`
-   - Run migration: `python scripts/migrate.py`
-
-2. **API Endpoints**: Add routes in `src/api/routes/`
-
-3. **Agent Workflows**: Extend workflows in `src/agents/`
-
-4. **Frontend Components**: Add to `frontend/src/components/`
-
-5. **Tests**: 
-   - Unit tests in `tests/unit/`
-   - Integration tests in `tests/integration/`
-   - Mock external dependencies in unit tests
-
-6. **Configuration**: Update `src/config.py` for new settings
-
-### Environment Variables
-
-Key configuration options in `.env`:
+### Test Data
 
 ```bash
-# AI Models
-OPENAI_API_KEY=your-key
-ANTHROPIC_API_KEY=your-key
-AGENT_MODEL=gpt-4
-AGENT_TEMPERATURE=0.7
+# Seed with complex pathway data
+docker-compose run --rm app seed
 
-# Workflow Configuration
-SIMILARITY_THRESHOLD=0.85
-CONTENT_SIMILARITY_LOW=0.3
-CONTENT_SIMILARITY_MEDIUM=0.6
-CONTENT_SIMILARITY_HIGH=0.8
-HUMAN_REVIEW_REQUIRED=true
-MAX_RETRIES=3
-
-# Database
-POSTGRES_HOST=postgres
-POSTGRES_DB=curriculum_builder
-POSTGRES_USER=curriculum_user
-POSTGRES_PASSWORD=curriculum_pass
-
-# Services
-CHROMA_HOST=chromadb
-CHROMA_PORT=8000
-REDIS_HOST=redis
-REDIS_PORT=6379
+# Generate specific pathway types
+docker-compose exec app python scripts/generate_pathway_data.py --type complex
+docker-compose exec app python scripts/generate_pathway_data.py --type simple
 ```
 
 ### Database Access
 
-**Connect to PostgreSQL Database**
 ```bash
-# Connect via Docker container
-docker compose exec postgres psql -U curriculum_user -d curriculum_builder
+# Connect to PostgreSQL
+docker-compose exec postgres psql -U curriculum_user -d curriculum_builder
 
-# Connect from host machine (if psql installed locally)
-psql -h localhost -p 5432 -U curriculum_user -d curriculum_builder
+# Common queries
+SELECT COUNT(*) FROM learning_content;
+SELECT * FROM users ORDER BY created_at DESC LIMIT 5;
+SELECT * FROM learning_outcomes WHERE status = 'approved';
 ```
 
-**Common Database Queries**
+### Architecture Components
 
-```sql
--- List all tables
-\dt
+- **FastAPI Application** (`src/main.py`): ASGI app with OpenAPI documentation
+- **Database Layer** (`src/db/`): Async SQLAlchemy with Alembic migrations
+- **AI Agents** (`src/agents/`): LangGraph workflows for content processing
+- **Vector Store** (`src/services/vector_store.py`): ChromaDB similarity search
+- **API Routes** (`src/api/routes/`): RESTful endpoints with Pydantic validation
+- **Frontend** (`frontend/`): Next.js with TypeScript and Tailwind CSS
+- **Documentation** (`docs/`): MkDocs Material for product and technical docs
 
--- View table structure
-\d learning_content
-\d users
-\d learning_pathways
+### Development Workflow
 
--- Query learning content
-SELECT id, title, tier, content_type, author, created_at 
-FROM learning_content 
-ORDER BY created_at DESC 
-LIMIT 10;
+1. **Database Changes**:
+   ```bash
+   # Update models in src/db/models/
+   docker-compose exec app alembic revision -m "description"
+   docker-compose run --rm app migrate
+   ```
 
--- Query users and their roles
-SELECT id, first_name, last_name, email, current_role, created_at 
-FROM users 
-ORDER BY created_at DESC;
+2. **API Development**:
+   ```bash
+   # Add routes in src/api/routes/
+   # Test endpoints
+   curl http://localhost:8001/api/v1/your-endpoint
+   ```
 
--- Query content with full details
-SELECT id, code_title, title, description, content_type, tier, 
-       personas, learning_objectives, estimated_duration, 
-       sandbox_type, aws_services, estimated_cost, status
-FROM learning_content 
-WHERE tier = 'T2' AND content_type = 'lesson';
+3. **Testing**:
+   ```bash
+   # Add tests in tests/unit/ or tests/integration/
+   docker-compose run --rm app test
+   ```
 
--- Query learning pathways with progress
-SELECT lp.id, lp.name, lp.target_persona, lp.estimated_duration,
-       COUNT(pi.id) as total_items,
-       AVG(pi.completion_percentage) as avg_progress
-FROM learning_pathways lp
-LEFT JOIN pathway_items pi ON lp.id = pi.pathway_id
-GROUP BY lp.id, lp.name, lp.target_persona, lp.estimated_duration;
+4. **Documentation**:
+   ```bash
+   # Update docs/ content
+   docker-compose run --rm -e BUILD_DOCS=true app docs
+   ```
 
--- Query user content progress
-SELECT u.first_name, u.last_name, lc.title, 
-       ucp.status, ucp.progress_percentage, ucp.time_spent_minutes
-FROM user_content_progress ucp
-JOIN users u ON ucp.user_id = u.id
-JOIN learning_content lc ON ucp.content_id = lc.id
-ORDER BY ucp.last_accessed_at DESC;
-
--- Query content with similarity search metadata
-SELECT id, title, content_type, tier, 
-       LENGTH(content_body) as content_length,
-       CASE WHEN content_body IS NOT NULL THEN 'Yes' ELSE 'No' END as has_content_body
-FROM learning_content 
-ORDER BY created_at DESC;
-```
-
-**Database Schema Overview**
-
-Key tables in the system:
-- `learning_content` - Main content items with metadata and content body
-- `users` - User accounts and profiles
-- `learning_pathways` - Learning paths and curricula
-- `pathway_items` - Items within learning pathways
-- `user_content_progress` - User progress tracking
-- `user_skill_assessments` - Skill level assessments
-- `assessment_questions` - Quiz and assessment content
-- `pricing_estimates` - Cost calculations for content
-
-### Database Management Commands
+### Environment Configuration
 
 ```bash
-# View database logs
-docker compose logs postgres
+# Required API Keys
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
 
-# Backup database
-docker compose exec postgres pg_dump -U curriculum_user curriculum_builder > backup.sql
+# Database (auto-configured for Docker)
+POSTGRES_DB=curriculum_builder
+POSTGRES_USER=curriculum_user
+POSTGRES_PASSWORD=curriculum_pass
 
-# Restore database
-docker compose exec -T postgres psql -U curriculum_user curriculum_builder < backup.sql
+# Application Settings
+AGENT_MODEL=gpt-4
+SIMILARITY_THRESHOLD=0.85
+HUMAN_REVIEW_REQUIRED=true
 
-# Reset database (WARNING: Destroys all data)
-docker compose down
-docker volume rm curriculum-builder-companion-agent_postgres_data
-docker compose up -d
+# Container Settings (for entrypoint.sh)
+RELOAD=true              # Development auto-reload
+SEED_DATABASE=true       # Generate test data
+BUILD_DOCS=false         # Build documentation
+WORKERS=1                # Uvicorn workers
 ```
+
+## 📊 Monitoring
+
+### Health Checks
+
+```bash
+# Application health
+curl http://localhost:8001/health
+
+# Service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f app
+```
+
+### Performance
+
+- **API Response Times**: <200ms for most endpoints
+- **Vector Search**: <500ms with ChromaDB
+- **Database Queries**: Optimized with proper indexes
+- **Memory Usage**: ~2GB for full development stack
 
 ## 🔧 Production Deployment
 

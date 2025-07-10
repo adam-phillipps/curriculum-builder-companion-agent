@@ -18,69 +18,76 @@ log_success() {
 
 case "$1" in
     "start")
-        log_info "Starting development environment..."
-        docker-compose up -d
-        ;;
-    "start-with-docs")
-        log_info "Starting development environment with documentation..."
-        docker-compose -f docker-compose.yml -f docker-compose.override.yml up app-with-docs -d
+        log_info "Starting full development environment..."
+        log_info "Running migrations..."
+        docker compose --profile migrate up migrator
+        log_info "Seeding database..."
+        docker compose --profile seed up seeder
+        log_info "Starting application and documentation..."
+        docker compose up -d app
+        docker compose --profile docs up -d docs
         ;;
     "start-minimal")
-        log_info "Starting minimal application (no migrations/seeding)..."
-        docker-compose -f docker-compose.yml -f docker-compose.override.yml up app-minimal -d
+        log_info "Starting minimal application (no setup tasks)..."
+        docker compose up -d app
+        ;;
+    "start-with-docs")
+        log_info "Starting application with documentation service..."
+        docker compose up -d app
+        docker compose --profile docs up -d docs
         ;;
     "migrate")
         log_info "Running database migrations..."
-        docker-compose run --rm app migrate
+        docker compose --profile migrate up migrator
         ;;
     "seed")
         log_info "Seeding database..."
-        docker-compose run --rm app seed
+        docker compose --profile seed up seeder
+        ;;
+    "docs")
+        log_info "Starting documentation service..."
+        docker compose --profile docs up -d docs
         ;;
     "test")
         log_info "Running tests..."
-        docker-compose run --rm app test
+        docker compose run --rm app test
         ;;
     "test-unit")
         log_info "Running unit tests..."
-        docker-compose run --rm -e TEST_TYPE=unit app test
+        docker compose run --rm -e TEST_TYPE=unit app test
         ;;
     "test-integration")
         log_info "Running integration tests..."
-        docker-compose run --rm -e TEST_TYPE=integration app test
-        ;;
-    "docs")
-        log_info "Building documentation..."
-        docker-compose run --rm app docs
+        docker compose run --rm -e TEST_TYPE=integration app test
         ;;
     "shell")
         log_info "Starting interactive shell..."
-        docker-compose exec app shell
+        docker compose exec app shell
         ;;
     "logs")
-        docker-compose logs -f app
+        docker compose logs -f app
         ;;
     "stop")
         log_info "Stopping all services..."
-        docker-compose down
+        docker compose down
         ;;
     "clean")
         log_info "Cleaning up containers and volumes..."
-        docker-compose down -v
+        docker compose down -v
         docker system prune -f
         ;;
     "help"|"--help"|"-h")
         echo "Development Commands:"
         echo ""
-        echo "  start              Start full development environment"
-        echo "  start-with-docs    Start with documentation building enabled"
-        echo "  start-minimal      Start app only (no migrations/seeding)"
+        echo "  start              Start full development environment (migrate + seed + app + docs)"
+        echo "  start-minimal      Start app only (no setup tasks)"
+        echo "  start-with-docs    Start app with documentation service"
         echo "  migrate            Run database migrations"
         echo "  seed               Seed database with test data"
+        echo "  docs               Start documentation service"
         echo "  test               Run all tests"
         echo "  test-unit          Run unit tests only"
         echo "  test-integration   Run integration tests only"
-        echo "  docs               Build documentation"
         echo "  shell              Interactive shell in app container"
         echo "  logs               Show application logs"
         echo "  stop               Stop all services"

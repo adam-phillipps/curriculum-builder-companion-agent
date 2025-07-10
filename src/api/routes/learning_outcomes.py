@@ -47,11 +47,27 @@ async def search_outcome_suggestions(
     domain: Optional[str] = Query(None, description="Filter by domain"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Search for similar learning outcomes to suggest to users."""
+    """Search for similar learning outcomes to suggest to users.
+    
+    This endpoint powers the learning goal autocomplete functionality.
+    It uses fast database text search first, then falls back to vector
+    similarity search for better matches. Always includes a custom
+    goal option for user-created objectives.
+    
+    Args:
+        query: Natural language description of learning goal
+        max_results: Maximum number of suggestions to return
+        domain: Optional domain filter (e.g., 'programming', 'data_science')
+        db: Database session dependency
+        
+    Returns:
+        List of outcome suggestions with similarity scores and metadata
+    """
     suggestions = []
     
     try:
-        # First try simple database text search (faster)
+        # Strategy: Fast database text search first, then vector search fallback
+        # This provides sub-second response times while maintaining quality
         from sqlalchemy import or_, func
         from src.db.models.learning_outcomes import LearningOutcome
         
@@ -59,7 +75,8 @@ async def search_outcome_suggestions(
             LearningOutcome.status == "approved"
         )
         
-        # Add text search conditions
+        # Text-based similarity using ILIKE for fast matching
+        # Searches across name, description, and tags for comprehensive coverage
         search_conditions = [
             LearningOutcome.name.ilike(f"%{query}%"),
             LearningOutcome.description.ilike(f"%{query}%"),
@@ -74,17 +91,18 @@ async def search_outcome_suggestions(
         result = await db.execute(db_query)
         db_outcomes = result.scalars().all()
         
-        # Convert database results to suggestions
+        # Convert database results to suggestions with calculated similarity scores
         for outcome in db_outcomes:
-            # Simple similarity score based on text match
+            # Heuristic similarity scoring based on text matches
+            # Name matches are weighted highest as they're most relevant
             name_match = query.lower() in outcome.name.lower()
             desc_match = query.lower() in (outcome.description or "").lower()
             tag_match = any(query.lower() in tag.lower() for tag in (outcome.tags or []))
             
-            similarity_score = 0.3  # Base score
-            if name_match: similarity_score += 0.5
-            if desc_match: similarity_score += 0.2
-            if tag_match: similarity_score += 0.3
+            similarity_score = 0.3  # Base score for any database match
+            if name_match: similarity_score += 0.5  # Name match is most important
+            if desc_match: similarity_score += 0.2  # Description provides context
+            if tag_match: similarity_score += 0.3   # Tags indicate related concepts
             
             suggestions.append(OutcomeSuggestion(
                 outcome_id=outcome.id,
@@ -97,12 +115,13 @@ async def search_outcome_suggestions(
                 is_existing=True
             ))
         
-        # Always try vector search for additional suggestions if we have few results
+        # Fallback to vector similarity search if database results are insufficient
+        # Vector search provides semantic matching but is slower
         if len(suggestions) < 3:
             try:
                 similar_outcomes = await search_similar_outcomes(
                     query_text=query,
-                    max_results=5,
+                    max_results=5,  # Limited for performance
                     domain_filter=domain
                 )
                 
@@ -150,19 +169,21 @@ async def search_outcome_suggestions(
             print(f"Vector search also failed: {ve}")
             # Continue to custom suggestion
     
-    # Always offer custom option
+    # Always provide option to create custom learning outcome
+    # This ensures users can always proceed even if no good matches exist
     suggestions.append(OutcomeSuggestion(
         outcome_id=None,
         name=query,
         description=f"Custom learning goal: {query}",
         domain="custom",
-        difficulty_level="intermediate",
+        difficulty_level="intermediate",  # Default difficulty for user-created goals
         tags=[],
-        similarity_score=0.0,
-        is_existing=False
+        similarity_score=0.0,  # Custom options have no similarity score
+        is_existing=False  # Indicates this will create a new outcome
     ))
     
-    # Sort by similarity score and limit results
+    # Sort by similarity score (highest first) and limit results
+    # Custom option will appear last due to 0.0 similarity score
     suggestions.sort(key=lambda x: x.similarity_score, reverse=True)
     return suggestions[:max_results]
 
