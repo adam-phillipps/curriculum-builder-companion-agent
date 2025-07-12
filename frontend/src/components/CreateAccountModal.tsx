@@ -114,7 +114,7 @@ export default function CreateAccountModal({ isOpen, onClose, onAccountCreated }
     
     try {
       console.log('Creating account with data:', formData);
-      const response = await api.post('/users/', formData);
+      const response = await api.post('/users', formData);
       const user = response.data;
       console.log('Account created:', user);
       

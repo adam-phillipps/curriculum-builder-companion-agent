@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { buildApiUrl } from '../config/api';
 
 interface User {
   id: number;
@@ -31,7 +32,7 @@ export default function UserSignInModal({ isOpen, onClose, onSignIn, onCreateAcc
 
     try {
       // Use the new sign-in by identifier endpoint
-      const response = await fetch('http://localhost:8001/users/sign-in/by-identifier', {
+      const response = await fetch(buildApiUrl('users/sign-in/by-identifier'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

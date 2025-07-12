@@ -74,3 +74,18 @@ output "ecs_security_group_id" {
   description = "ECS security group ID"
   value       = module.networking.ecs_security_group_id
 }
+
+output "api_url" {
+  description = "API endpoint URL"
+  value       = module.api_gateway.custom_domain_url != "" ? module.api_gateway.custom_domain_url : module.api_gateway.api_gateway_url
+}
+
+output "api_gateway_url" {
+  description = "API Gateway URL"
+  value       = module.api_gateway.api_gateway_url
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID"
+  value       = module.s3.cloudfront_distribution_id
+}

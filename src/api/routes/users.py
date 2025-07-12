@@ -21,7 +21,7 @@ from src.config import BuilderConstants
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db)

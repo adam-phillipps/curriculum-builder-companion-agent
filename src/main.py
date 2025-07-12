@@ -34,18 +34,51 @@ app = FastAPI(
     ]
 )
 
-# Add CORS middleware
+# Production-grade CORS validation function
+def validate_cors_origin(origin: str) -> bool:
+    """Validate CORS origin against allowed patterns."""
+    if settings.APP_ENV == "development" and settings.CORS_ALLOW_ALL_DEV:
+        return True
+    
+    # Parse origin to get host
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(origin)
+        host = parsed.netloc or parsed.path
+    except:
+        return False
+    
+    # Check against allowed host patterns
+    for pattern in settings.CORS_ALLOWED_HOSTS:
+        if pattern.startswith("*."):
+            # Wildcard subdomain matching
+            domain_suffix = pattern[2:]
+            if host.endswith(f".{domain_suffix}") or host == domain_suffix:
+                return True
+        elif host == pattern:
+            # Exact match
+            return True
+    
+    return False
+
+# Configure CORS with pattern-based validation
+if settings.APP_ENV == "development" and settings.CORS_ALLOW_ALL_DEV:
+    # Development: allow all
+    cors_origins = ["*"]
+    cors_credentials = False
+else:
+    # Production: use regex pattern for CloudFront and AWS domains
+    cors_origins = None
+    cors_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000", 
-        "http://frontend:3000",
-        "https://dczs8zbwc9iyf.cloudfront.net",
-        "*"  # Allow all origins for now - should be restricted in production
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.cloudfront\.net|https://.*\.amazonaws\.com|http://localhost:3000|http://frontend:3000" if not cors_origins else None,
+    allow_credentials=cors_credentials,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.include_router(content.router, prefix="/api/v1")

@@ -108,6 +108,10 @@ resource "aws_ecs_task_definition" "api" {
           value = var.environment
         },
         {
+          name  = "APP_ENV"
+          value = var.environment == "production" ? "production" : "development"
+        },
+        {
           name  = "REDIS_HOST"
           value = var.redis_endpoint
         },
@@ -351,7 +355,7 @@ resource "aws_ecs_task_definition" "docs_build" {
       name  = "docs-build"
       image = "${var.api_image}:${var.api_image_tag}"
       
-      command = ["python", "scripts/build_docs.py"]
+      command = ["/app/scripts/entrypoint.sh", "docs"]
       
       environment = [
         {

@@ -76,6 +76,29 @@ module "elasticache" {
   tags               = local.environment_tags
 }
 
+# DNS and SSL (optional - only if domain provided)
+module "dns_ssl" {
+  source = "../../modules/dns-ssl"
+  
+  domain_name    = var.domain_name
+  api_subdomain  = "api"
+  environment    = "sandbox"
+  alb_dns_name   = module.ecs.alb_dns_name
+  alb_zone_id    = module.ecs.alb_zone_id
+  tags           = local.environment_tags
+}
+
+# API Gateway for HTTPS
+module "api_gateway" {
+  source = "../../modules/api-gateway"
+  
+  environment     = "sandbox"
+  alb_dns_name    = module.ecs.alb_dns_name
+  domain_name     = var.domain_name
+  certificate_arn = module.dns_ssl.certificate_arn
+  tags            = local.environment_tags
+}
+
 # ECS Cluster
 module "ecs" {
   source = "../../modules/ecs-cluster"
@@ -91,6 +114,7 @@ module "ecs" {
   secrets_arn           = module.secrets.secrets_arn
   content_bucket_arn    = module.s3.content_bucket_arn
   sandbox_bucket_arn    = module.s3.sandbox_bucket_arn
+  certificate_arn       = module.dns_ssl.certificate_arn
   tags                  = local.environment_tags
 }
 

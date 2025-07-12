@@ -82,7 +82,7 @@ export class ApiClient {
 
   // User API methods
   static async getUsers() {
-    return this.makeRequest('users/');
+    return this.makeRequest('users');
   }
 
   static async getAvailableRoles() {

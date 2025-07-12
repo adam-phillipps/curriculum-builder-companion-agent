@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { buildApiUrl } from '../../config/api';
 
 interface User {
   id: number;
@@ -53,7 +54,7 @@ export default function ContentPreviewModal({
     if (!currentUser) return;
     
     try {
-      const response = await fetch(`http://localhost:8001/api/v1/progress/${currentUser.id}/${content.id}`);
+      const response = await fetch(buildApiUrl(`progress/${currentUser.id}/${content.id}`));
       if (response.ok) {
         const progress = await response.json();
         setIsEnrolled(true);
@@ -71,7 +72,7 @@ export default function ContentPreviewModal({
     
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8001/api/v1/progress/enroll', {
+      const response = await fetch(buildApiUrl('progress/enroll'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,7 +98,7 @@ export default function ContentPreviewModal({
     setComprehension(value);
     
     try {
-      await fetch('http://localhost:8001/api/v1/progress/update', {
+      await fetch(buildApiUrl('progress/update'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +117,7 @@ export default function ContentPreviewModal({
     
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8001/api/v1/progress/update', {
+      const response = await fetch(buildApiUrl('progress/update'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

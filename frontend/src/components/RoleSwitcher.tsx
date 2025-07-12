@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { buildDocsUrl } from '../config/api';
 
 interface User {
   id: number;
@@ -78,7 +79,7 @@ export default function RoleSwitcher({ currentUser, onRoleChange }: RoleSwitcher
       
       {/* Help Button */}
       <a
-        href={`http://localhost:8080/docs/product/user-guides/${currentUser.current_role === 'curriculum_architect' ? 'administrators' : currentUser.current_role}s/`}
+        href={buildDocsUrl(`docs/product/user-guides/${currentUser.current_role === 'curriculum_architect' ? 'administrators' : currentUser.current_role}s/`)}
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-center justify-center w-8 h-8 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"

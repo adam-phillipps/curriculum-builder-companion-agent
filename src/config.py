@@ -50,6 +50,14 @@ class Settings(BaseSettings):
     # Documentation service configuration
     DOCS_HOST: str = "localhost"
     DOCS_PORT: int = 8080
+    
+    # CORS configuration - production grade patterns
+    CORS_ALLOWED_HOSTS: list[str] = [
+        "localhost:3000",
+        "*.cloudfront.net",
+        "*.amazonaws.com"
+    ]
+    CORS_ALLOW_ALL_DEV: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

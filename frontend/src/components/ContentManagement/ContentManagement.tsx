@@ -6,6 +6,7 @@ import ContentPreviewModal from './ContentPreviewModal';
 import ContentFilters from './ContentFilters';
 import ContentViewer from './ContentViewer';
 import { ApiClient } from '../../lib/api';
+import { buildApiUrl } from '../../config/api';
 
 interface Content {
   id: number;
@@ -83,7 +84,7 @@ export default function ContentManagement({ currentUser }: ContentManagementProp
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:8001/api/v1/vector/search', {
+      const response = await fetch(buildApiUrl('vector/search'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,7 +138,7 @@ export default function ContentManagement({ currentUser }: ContentManagementProp
       let hasMore = true;
       
       while (hasMore) {
-        const response = await fetch(`http://localhost:8001/api/v1/content?skip=${skip}&limit=${limit}`);
+        const response = await fetch(buildApiUrl(`content?skip=${skip}&limit=${limit}`));
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }

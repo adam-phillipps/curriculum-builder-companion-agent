@@ -92,7 +92,7 @@ cmd_deploy() {
     local env=${1:-sandbox}
     log_info "Deploying infrastructure to $env environment"
     
-    cd "$PROJECT_ROOT/terraform/environments/$env"
+    cd "$PROJECT_ROOT/infra/environments/$env"
     
     if [ ! -f "terraform.tfvars" ]; then
         log_error "terraform.tfvars not found. Copy from terraform.tfvars.example"
@@ -193,6 +193,7 @@ EOF
 
 build_frontend() {
     local env=$1
+    local clear_cache=${2:-false}
     
     log_info "Building frontend for $env environment using Docker"
     
@@ -231,17 +232,18 @@ build_frontend() {
     cd "$PROJECT_ROOT"
     
     log_info "Building frontend with Docker..."
-    # Get ALB DNS name from terraform output
-    local alb_dns=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw alb_dns_name 2>/dev/null)
+    # Get API Gateway URL or ALB DNS name for API calls
+    # Get API URL from terraform output (handles HTTPS/HTTP automatically)
+    local api_url=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw api_url 2>/dev/null)
     
-    if [ -z "$alb_dns" ]; then
-        log_error "Could not get ALB DNS name from terraform output"
+    if [ -z "$api_url" ]; then
+        log_error "Could not get API URL from terraform output"
         return 1
     fi
     
-    log_info "Using API URL: http://$alb_dns"
+    log_info "Using API URL: $api_url"
     docker build --target frontend-builder -f Dockerfile \
-        --build-arg NEXT_PUBLIC_API_URL="http://$alb_dns" \
+        --build-arg NEXT_PUBLIC_API_URL="$api_url" \
         -t curriculum-frontend:latest .
     
     # Extract build output to local directory for S3 sync
@@ -251,12 +253,26 @@ build_frontend() {
     log_info "Deploying to S3..."
     aws s3 sync "$PROJECT_ROOT/frontend/out/" "s3://$bucket_name/" --delete --profile "$AWS_PROFILE" --region "$AWS_REGION"
     
-    # Invalidate CloudFront cache
+    # Invalidate CloudFront cache if requested or always for deployment
     local distribution_id=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw cloudfront_distribution_id 2>/dev/null)
     
     if [ -n "$distribution_id" ] && [ "$distribution_id" != "" ]; then
-        log_info "Invalidating CloudFront cache..."
-        aws cloudfront create-invalidation --distribution-id "$distribution_id" --paths "/*" --profile "$AWS_PROFILE" --region "$AWS_REGION" >/dev/null
+        if [ "$clear_cache" = "true" ] || [ "$clear_cache" = "--clear-cache" ]; then
+            log_info "Creating CloudFront invalidation (forced)..."
+            local invalidation_id=$(aws cloudfront create-invalidation \
+                --distribution-id "$distribution_id" \
+                --paths "/*" \
+                --profile "$AWS_PROFILE" \
+                --region "$AWS_REGION" \
+                --query 'Invalidation.Id' \
+                --output text)
+
+            log_info "Invalidation created: $invalidation_id"
+            log_info "You can wait for completion with: aws cloudfront wait invalidation-completed --distribution-id $distribution_id --id $invalidation_id --profile $AWS_PROFILE"
+        else
+            log_info "Invalidating CloudFront cache..."
+            aws cloudfront create-invalidation --distribution-id "$distribution_id" --paths "/*" --profile "$AWS_PROFILE" --region "$AWS_REGION" >/dev/null
+        fi
     fi
     
     log_success "Frontend deployed successfully"
@@ -273,10 +289,19 @@ build_frontend_inspect() {
         load_config "$env"
         verify_aws
         
-        local alb_dns=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw alb_dns_name 2>/dev/null)
+        local api_endpoint=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw api_gateway_url 2>/dev/null)
+
+        if [ -z "$api_endpoint" ]; then
+            # Fallback to ALB
+            local alb_dns=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw alb_dns_name 2>/dev/null)
+            if [ -n "$alb_dns" ]; then
+                api_url="http://$alb_dns"
+            fi
+        else
+            api_url="$api_endpoint"
+        fi
         
-        if [ -n "$alb_dns" ]; then
-            api_url="http://$alb_dns"
+        if [ "$api_url" != "http://localhost:8001" ]; then
             log_info "Using API URL: $api_url"
         fi
     fi
@@ -463,7 +488,16 @@ cmd_build() {
             build_image_stage "curriculum-docs" "docs" "$increment_type" "$docs_repo_url"
             ;;
         "frontend")
-            build_frontend "$env"
+            # Check for --clear-cache flag in remaining arguments
+            local clear_cache=false
+            shift 3 # Skip env, image_name, increment_type
+            for arg in "$@"; do
+                if [ "$arg" = "--clear-cache" ]; then
+                    clear_cache=true
+                    break
+                fi
+            done
+            build_frontend "$env" "$clear_cache"
             ;;
         "inspect-frontend")
             build_frontend_inspect "$env"
@@ -472,7 +506,16 @@ cmd_build() {
             build_image_stage "curriculum-api" "api" "$increment_type" "$api_repo_url"
             build_image_stage "curriculum-migrate" "migrate" "$increment_type" "$migrate_repo_url"
             build_image_stage "curriculum-docs" "docs" "$increment_type" "$docs_repo_url"
-            build_frontend "$env"
+            # Check for --clear-cache flag in remaining arguments
+            local clear_cache=false
+            shift 3 # Skip env, image_name, increment_type
+            for arg in "$@"; do
+                if [ "$arg" = "--clear-cache" ]; then
+                    clear_cache=true
+                    break
+                fi
+            done
+            build_frontend "$env" "$clear_cache"
             ;;
         *)
             log_error "Unknown image: $image_name"
@@ -575,7 +618,7 @@ cmd_docs() {
     
     if [ "$exit_code" = "0" ]; then
         log_success "Documentation build completed successfully"
-        log_info "Documentation available at: https://$(cd "$PROJECT_ROOT/terraform/environments/$env" && terraform output -raw frontend_url)/docs/"
+        log_info "Documentation available at: https://$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw frontend_url)/docs/"
     else
         log_error "Documentation build failed with exit code: $exit_code"
         exit 1
@@ -717,6 +760,59 @@ cmd_logs() {
         --output table
 }
 
+cmd_test_cors() {
+    local env=${1:-sandbox}
+
+    load_config "$env"
+    verify_aws
+
+    if [ "$IS_LOCAL" = true ]; then
+        log_info "Testing local CORS configuration"
+        local api_url="http://localhost:8001"
+        local origin="http://localhost:3000"
+    else
+        # Get API endpoint
+        # Get API URL from terraform output (handles HTTPS/HTTP automatically)
+        local api_url=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw api_url 2>/dev/null)
+
+        # Get frontend URL for origin test
+        local frontend_url=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw frontend_url 2>/dev/null)
+        # Use frontend URL as-is (already includes https://)
+        local origin="$frontend_url"
+    fi
+
+    log_info "Testing CORS from origin: $origin"
+    log_info "Testing API endpoint: $api_url"
+
+    # Test CORS preflight
+    local cors_response=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Origin: $origin" \
+        -H "Access-Control-Request-Method: POST" \
+        -H "Access-Control-Request-Headers: Content-Type" \
+        -X OPTIONS "$api_url/api/v1/health" 2>/dev/null || echo "000")
+
+    if [ "$cors_response" = "200" ] || [ "$cors_response" = "204" ]; then
+        log_success "CORS preflight test passed (HTTP $cors_response)"
+    else
+        log_error "CORS preflight test failed (HTTP $cors_response)"
+        log_info "Try rebuilding frontend with: $0 build $env frontend --clear-cache"
+        return 1
+    fi
+
+    # Test actual API call
+    local api_response=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Origin: $origin" \
+        "$api_url/health" 2>/dev/null || echo "000")
+
+    if [ "$api_response" = "200" ]; then
+        log_success "API health check passed (HTTP $api_response)"
+        log_success "CORS configuration is working correctly"
+    else
+        log_error "API health check failed (HTTP $api_response)"
+        return 1
+    fi
+}
+
 cmd_test_db() {
     local env=${1:-sandbox}
     
@@ -780,10 +876,11 @@ Commands:
     --openai-key KEY           OpenAI API key
     --anthropic-key KEY        Anthropic API key  
     --non-interactive          Non-interactive mode
-  build [env] [image] [increment] Build and push Docker image or frontend
+  build [env] [image] [increment] [--clear-cache] Build and push Docker image or frontend
     Env: local (build only), sandbox, production
     Images: curriculum-api, curriculum-migrate, curriculum-docs, frontend, inspect-frontend, all
     Increment: patch, minor, major (Docker images only)
+    --clear-cache: Force CloudFront invalidation for frontend builds
   migrate [env]               Run database migration (local|AWS)
   docs [env]                  Build and deploy documentation (local|AWS)
   seed [env] [type]           Generate test data (local only)
@@ -792,6 +889,7 @@ Commands:
     Actions: start, stop, clean, logs, shell
   logs [env] [service]        Show logs for service (migrate, docs, api)
   test-db [env]               Test database connectivity
+  test-cors [env]             Test CORS configuration and API connectivity
   help                        Show this help
 
 Environments:
@@ -803,10 +901,12 @@ Examples:
   $0 migrate                  # Local migration
   $0 migrate sandbox          # AWS migration
   $0 test-db sandbox          # Test database connection
+  $0 test-cors sandbox        # Test CORS configuration
   $0 logs sandbox migrate     # Show migration logs
   $0 seed local pathway       # Generate pathway data locally
   $0 dev start               # Start local development
   $0 deploy sandbox          # Deploy to AWS
+  $0 build sandbox frontend --clear-cache  # Build frontend with cache busting
   $0 secrets sandbox --openai-key "sk-..." --anthropic-key "sk-..."
 
 Local commands work with Docker Compose, AWS commands require infra configuration.
@@ -824,6 +924,7 @@ case "${1:-help}" in
     dev) cmd_dev "${2:-start}" ;;
     logs) cmd_logs "${2:-sandbox}" "${3:-migrate}" ;;
     test-db) cmd_test_db "${2:-sandbox}" ;;
+    test-cors) cmd_test_cors "${2:-sandbox}" ;;
     help|--help|-h) cmd_help ;;
     *) log_error "Unknown command: $1"; cmd_help; exit 1 ;;
 esac

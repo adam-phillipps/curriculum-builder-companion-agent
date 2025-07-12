@@ -167,9 +167,8 @@ case "$1" in
         seed_database
         ;;
     "docs")
-        log_info "Documentation service not needed in app container"
-        log_info "Use 'docker compose --profile docs up -d docs' instead"
-        exit 0
+        log_info "Building documentation..."
+        build_docs
         ;;
     "test")
         run_tests

@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiClient } from '../../lib/api';
+import { buildApiUrl } from '../../config/api';
 
 interface ContentViewerProps {
   contentId: number;
@@ -70,7 +71,7 @@ export default function ContentViewer({ contentId, onClose }: ContentViewerProps
         setError(null);
         
         // Get specific content item by ID
-        const response = await fetch(`http://localhost:8001/api/v1/content/${contentId}`);
+        const response = await fetch(buildApiUrl(`content/${contentId}`));
         if (!response.ok) {
           if (response.status === 404) {
             throw new Error(`Content with ID ${contentId} not found`);

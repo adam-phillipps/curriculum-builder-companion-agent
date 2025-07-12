@@ -363,6 +363,10 @@ AGENT_MODEL=gpt-4
 SIMILARITY_THRESHOLD=0.85
 HUMAN_REVIEW_REQUIRED=true
 
+# CORS Configuration (automatic)
+APP_ENV=development      # Allows all origins for local dev
+# APP_ENV=production     # Uses pattern-based validation for CloudFront/ALB
+
 # Container Settings (for entrypoint.sh)
 RELOAD=true              # Development auto-reload
 SEED_DATABASE=true       # Generate test data
@@ -394,21 +398,47 @@ docker-compose logs -f app
 
 ## 🔧 Production Deployment
 
-### AWS Infrastructure (Planned)
+### AWS Infrastructure
 
 - **ECS/Fargate**: Container orchestration
 - **RDS PostgreSQL**: Managed database
 - **ElastiCache Redis**: Managed cache
-- **Application Load Balancer**: Traffic distribution
+- **Application Load Balancer**: Traffic distribution with HTTPS support
+- **Route53 + ACM**: DNS and SSL certificate management
 - **CloudWatch**: Monitoring and logging
+
+### HTTPS Setup (Optional)
+
+To enable HTTPS with your own domain:
+
+1. **Create Route53 hosted zone** for your domain
+2. **Update terraform.tfvars**:
+   ```hcl
+   domain_name = "yourdomain.com"
+   ```
+3. **Deploy infrastructure**:
+   ```bash
+   ./scripts/ngage-cli.sh deploy sandbox
+   ```
+
+**Cost**: ~$0.50-1.00/month for Route53 hosted zone
+
+**What happens automatically**:
+- ACM certificate created and validated via DNS
+- ALB configured with HTTPS listener (443) and HTTP redirect (80→443)
+- Route53 A record created: `api.yourdomain.com` → ALB
+- Frontend uses `https://api.yourdomain.com` for API calls
+
+**Without domain**: Uses HTTP on ALB directly (development/testing)
 
 ### Terraform IaC
 
-Infrastructure as Code will be provided for AWS deployment with:
+Infrastructure as Code provides:
 - Auto-scaling groups
 - Security groups and VPC configuration
 - Database backups and monitoring
-- CI/CD pipeline integration
+- Automatic HTTPS/HTTP configuration
+- DNS and SSL certificate management
 
 ## 🤝 Contributing
 
@@ -467,6 +497,38 @@ Structured logging with:
 - **Authentication**: JWT-based (planned)
 - **Rate Limiting**: Request throttling (planned)
 - **Input Validation**: Pydantic schemas for all inputs
+- **CORS**: Automatic pattern-based validation for production deployments
+
+### CORS Configuration
+
+CORS is automatically configured based on your deployment environment:
+
+- **Local Development** (`APP_ENV=development`): Allows all origins for easy development
+- **Production** (`APP_ENV=production`): Uses pattern-based validation:
+  - `*.cloudfront.net` - CloudFront distributions
+  - `*.amazonaws.com` - ALB/API Gateway domains
+  - `localhost:3000` - Local frontend development
+
+**No manual CORS configuration needed!** The system automatically adapts to your infrastructure.
+
+#### Troubleshooting CORS Issues
+
+If you encounter CORS errors:
+
+1. **Check environment**: Ensure `APP_ENV` is set correctly
+2. **Rebuild frontend**: Use `./scripts/ngage-cli.sh build [env] frontend --clear-cache`
+3. **Verify API URL**: Frontend should use the correct API endpoint (not CloudFront)
+4. **Check browser console**: Look for specific CORS error messages
+
+```bash
+# Force rebuild with cache clearing
+./scripts/ngage-cli.sh build sandbox frontend --clear-cache
+
+# Check current CORS configuration
+curl -H "Origin: https://your-domain.cloudfront.net" \
+     -H "Access-Control-Request-Method: POST" \
+     -X OPTIONS https://your-api-endpoint/api/v1/health
+```
 
 ## 📚 Resources
 
@@ -561,6 +623,13 @@ We welcome contributions in these key areas:
 - **Goal**: Better vector similarity with proper score spread
 - **Why**: Improve content discovery and recommendations
 - **Skills**: Vector databases, embeddings, similarity algorithms
+
+#### 🗄️ **Vector Store Infrastructure Improvements**
+- **Current**: ChromaDB running on Fargate (expensive, limited)
+- **Goal**: Better vector store infrastructure options
+- **Options**: EC2 cluster for ChromaDB, Pinecone integration, configurable vector stores
+- **Why**: Cost optimization, better performance, user choice flexibility
+- **Skills**: Vector databases, AWS infrastructure, database configuration
 
 #### 🤖 **ML Content Classification**
 - **Current**: Only LLMs for content categorization (expensive)
