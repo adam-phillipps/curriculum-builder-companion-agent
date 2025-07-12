@@ -48,6 +48,9 @@ frontend/package-lock.json
 frontend/yarn.lock
 frontend/pnpm-lock.yaml
 
+# Frontend Deploy Debugging
+frontend-inspect/
+
 # Alembic
 alembic/versions/*.pyc
 

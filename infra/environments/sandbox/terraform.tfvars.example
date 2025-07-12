@@ -1,0 +1,12 @@
+# Copy this file to terraform.tfvars and update with your values
+
+aws_region  = "us-west-2"
+aws_profile = "default"  # Change to your AWS credentials profile name
+
+# Optional: Set domain name for production deployments
+# domain_name = "curriculum-builder.yourdomain.com"
+
+# These will be stored in AWS Secrets Manager
+# Use placeholder values - real keys will be updated after deployment
+openai_api_key    = "placeholder-openai-key"
+anthropic_api_key = "placeholder-anthropic-key"

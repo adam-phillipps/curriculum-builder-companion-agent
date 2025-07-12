@@ -63,6 +63,36 @@ This platform provides:
 - Python 3.11+ (for local development)
 - 8GB+ RAM recommended
 
+## 🛠️ Development Environment Requirements
+
+For developers contributing to this project, ensure you have:
+
+### Required Tools
+- **AWS CLI** - Configured with sufficient permissions for:
+  - ECS (Fargate tasks, services, clusters)
+  - ECR (Docker registry)
+  - RDS (PostgreSQL)
+  - S3 (Static website hosting)
+  - CloudFront (CDN)
+  - Secrets Manager
+  - VPC, subnets, security groups
+- **Docker & Docker Compose** - For consistent local development
+- **Terraform** - Infrastructure as Code deployment
+- **Node.js 18+** - Frontend development (if not using Docker)
+- **Python 3.11+** - Backend development (if not using Docker)
+
+### AWS Permissions
+Your AWS profile needs permissions for all services used by the Terraform configurations in `infra/environments/`.
+
+### Verification
+```bash
+# Verify tools are installed
+aws --version
+docker --version
+docker compose version
+terraform --version
+```
+
 ### Setup
 
 1. **Clone and configure**
@@ -489,6 +519,123 @@ For questions and support:
 **Built with ❤️ for efficient learning and curriculum development**
 
 ---
+
+## 🤝 Contributing
+
+### Areas Needing Help
+
+We welcome contributions in these key areas:
+
+#### 🏗️ **Architecture Redesign**
+- **Current**: Monolithic FastAPI application
+- **Goal**: Service-Oriented Architecture (SOA) or microservices
+- **Why**: Better scalability, maintainability, and team autonomy
+- **Skills**: Python, FastAPI, Docker, distributed systems
+
+#### 🛠️ **Infrastructure Cleanup** 
+- **Current**: Large, complex CLI script and extensive IaC
+- **Goal**: Simplified, professional-grade infrastructure code
+- **Why**: Easier maintenance, better developer experience
+- **Skills**: Terraform, AWS, DevOps, shell scripting
+
+#### 💰 **Cost Optimization**
+- **Current**: AWS Fargate (expensive)
+- **Goal**: More cost-effective container orchestration
+- **Options**: ECS on EC2, EKS, or alternative platforms
+- **Skills**: AWS, Kubernetes, cost analysis
+
+#### 📊 **Observability Enhancement**
+- **Current**: Basic telemetry and logging
+- **Goal**: Comprehensive monitoring, alerting, and dashboards
+- **Tools**: CloudWatch, Grafana, Prometheus, OpenTelemetry
+- **Skills**: Monitoring, metrics, distributed tracing
+
+#### 🧪 **Testing Improvements**
+- **Current**: Mixed quality test suite (283 tests)
+- **Goal**: Comprehensive, reliable, fast test coverage
+- **Focus**: Integration tests, performance tests, contract testing
+- **Skills**: pytest, testing strategies, CI/CD
+
+#### 🔍 **Similarity Search Enhancement**
+- **Current**: Poor score distribution, similar items don't score high
+- **Goal**: Better vector similarity with proper score spread
+- **Why**: Improve content discovery and recommendations
+- **Skills**: Vector databases, embeddings, similarity algorithms
+
+#### 🤖 **ML Content Classification**
+- **Current**: Only LLMs for content categorization (expensive)
+- **Goal**: Use ML models for domains/tags/learning outcomes
+- **Why**: Cost-effective for large content imports (MOOCs)
+- **Skills**: Machine learning, NLP, content classification
+
+#### ⚙️ **Configurable AI Workflows**
+- **Current**: Fixed LLM workflows for content processing
+- **Goal**: User-configurable agentic workflows with their own LLMs
+- **Why**: Reduce costs, allow user context retention
+- **Skills**: LangGraph, workflow orchestration, API design
+
+#### 📊 **Frontend Graph Fixes**
+- **Current**: Wonky learner progress graph centering
+- **Goal**: Properly centered, responsive D3.js visualizations
+- **Why**: Better user experience and data presentation
+- **Skills**: D3.js, frontend development, data visualization
+
+#### 🎨 **Better UX**
+- **Current**: Functional but could be more intuitive
+- **Goal**: Improved user experience across all interfaces
+- **Why**: Better adoption and usability
+- **Skills**: UI/UX design, frontend development, user research
+
+#### 💰 **Configurable Cost Guardrails**
+- **Current**: No cost controls or limits
+- **Goal**: User-configurable spending limits and alerts
+- **Why**: Prevent runaway costs from AI/LLM usage
+- **Skills**: AWS billing APIs, cost monitoring, alerting
+
+#### 📊 **Cost Dashboard**
+- **Current**: Basic AWS billing visibility
+- **Goal**: Detailed cost breakdown by feature and user activity
+- **Why**: Understand what's expensive and optimize accordingly
+- **Skills**: AWS Cost Explorer, data visualization, analytics
+
+#### 🔄 **Educational Content Data Pipelines**
+- **Current**: Manual content creation only
+- **Goal**: Automated ingestion of videos, transcription, module creation
+- **Why**: Leverage hundreds of thousands of free educational resources
+- **Skills**: Video processing, speech-to-text, content automation
+
+#### 🤖 **Extract Agentic Workflow as Standalone Service**
+- **Current**: Agentic content processing is embedded in the monolith
+- **Goal**: Separate service/library for AI-powered content creation workflows
+- **Why**: This was the original tool that started it all - help people create learning content without rambling explanations
+- **Skills**: LangGraph, microservices, API design, packaging
+
+#### 📦 **Extract Other Useful Components**
+- **Current**: Useful parts buried in the monolithic application
+- **Goal**: Identify and extract reusable components as standalone libraries
+- **Examples**: Vector similarity search, learning pathway analysis, cost tracking
+- **Why**: Let people use the good parts without adopting the whole system
+- **Skills**: Library design, packaging, documentation, API design
+
+#### 📊 **Agentic Workflow Analytics Dashboard**
+- **Current**: No visibility into which AI workflow configurations work best
+- **Goal**: Analytics showing which LLM combinations produce optimal results
+- **Example**: Track that Anthropic Sonnet + GPT-4 combo outperforms single-provider setups
+- **Why**: Help architects optimize AI workflows for better content quality
+- **Skills**: Analytics, data visualization, A/B testing, ML evaluation
+
+#### 🌟 **Better #all-the-things**
+- **Current**: Pretty much everything could use some love
+- **Goal**: You pick what you want to improve!
+- **Why**: Because there's always room for improvement
+- **Skills**: Whatever you're passionate about!
+
+### How to Contribute
+
+1. **Pick an area** that matches your skills and interests
+2. **Open an issue** to discuss your approach
+3. **Start small** with focused improvements
+4. **Follow our coding standards** and test requirements
 
 ## 🤝 Contributing to Open Education
 

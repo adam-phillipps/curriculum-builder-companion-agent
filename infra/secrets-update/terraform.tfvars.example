@@ -1,0 +1,16 @@
+# Copy this file to terraform.tfvars and update with your values
+
+aws_region  = "us-west-2"
+aws_profile = "ngage"  # Change to your AWS credentials profile name
+
+# Get these values from main deployment outputs
+secrets_manager_arn = "arn:aws:secretsmanager:us-west-2:549463403527:secret:sandbox-curriculum-secrets-gQ7rRI"
+
+# Real API keys (keep secure!)
+openai_api_key    = "your-real-openai-api-key"
+anthropic_api_key = "your-real-anthropic-api-key"
+
+# Generated secrets from main deployment (get from terraform output -json)
+app_secret_key    = "generated-secret-from-main-deployment"
+postgres_password = "generated-password-from-main-deployment"
+redis_auth_token  = "generated-token-from-main-deployment"

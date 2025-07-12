@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { buildApiUrl } from '../config/api';
 
 interface CreateAccountModalProps {
   isOpen: boolean;
@@ -62,7 +63,7 @@ export default function CreateAccountModal({ isOpen, onClose, onAccountCreated }
     setSearchingGoals(true);
     try {
       const response = await fetch(
-        `http://localhost:8001/api/v1/learning-outcomes/search?query=${encodeURIComponent(query)}&max_results=5`
+        buildApiUrl(`learning-outcomes/search?query=${encodeURIComponent(query)}&max_results=5`)
       );
       
       if (response.ok) {
@@ -124,7 +125,7 @@ export default function CreateAccountModal({ isOpen, onClose, onAccountCreated }
           
           // If it's a custom goal, create it first
           if (!selectedGoal.is_existing) {
-            const goalResponse = await fetch('http://localhost:8001/api/v1/learning-outcomes/', {
+            const goalResponse = await fetch(buildApiUrl('learning-outcomes/'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -145,7 +146,7 @@ export default function CreateAccountModal({ isOpen, onClose, onAccountCreated }
           
           // Set as primary goal
           if (goalId) {
-            await fetch(`http://localhost:8001/users/${user.id}/primary-goal`, {
+            await fetch(buildApiUrl(`users/${user.id}/primary-goal`), {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ learning_outcome_id: goalId })

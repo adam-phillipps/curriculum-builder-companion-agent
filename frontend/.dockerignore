@@ -1,13 +1,32 @@
-Dockerfile
-.dockerignore
-node_modules
-npm-debug.log
-README.md
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Production build
+.next/
+out/
+
+# Environment
 .env
-.env.local
-.env.production.local
-.env.staging.local
-.git
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
 .gitignore
-.next
-.vercel
+
+# Documentation
+*.md
+
+# Testing
+coverage/
+.nyc_output/

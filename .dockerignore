@@ -1,19 +1,37 @@
+# Git
+.git
+.gitignore
+.github/
+
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
 env/
-venv/
 .venv/
+venv/
 pip-log.txt
 pip-delete-this-directory.txt
-
-# Testing
-.pytest_cache/
+.tox/
 .coverage
-htmlcov/
+.coverage.*
+.pytest_cache/
+nosetests.xml
+*.egg-info/
+dist/
+build/
+
+# Documentation
+docs/
+site/
+.mkdocs/
+mkdocs.yml
+README.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+LICENSE
 
 # IDE
 .vscode/
@@ -25,24 +43,38 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Git
-.git/
-.gitignore
+# Infrastructure
+infra/
+*.tfstate
+*.tfstate.*
+.terraform/
 
 # Docker
 Dockerfile*
-docker-compose*
 .dockerignore
+docker-compose.yml
 
 # Environment
-.env
-.env.local
-.env.*.local
+.env*
 
 # Logs
 *.log
 logs/
 
-# Database
-*.db
-*.sqlite
+# Test files
+tests/
+test_*
+pytest.ini
+
+# Frontend build artifacts (but keep source)
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+frontend-inspect/
+
+# Include all scripts for different tasks
+# scripts/ - included
+
+# Other
+.python-version
+requirements-docs.txt

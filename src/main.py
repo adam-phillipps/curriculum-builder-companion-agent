@@ -37,20 +37,25 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://frontend:3000"],
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://frontend:3000",
+        "https://dczs8zbwc9iyf.cloudfront.net",
+        "*"  # Allow all origins for now - should be restricted in production
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(content.router)
-app.include_router(agents.router)
-app.include_router(vector_store.router)
-app.include_router(analysis.router)
-app.include_router(users.router)
-app.include_router(pathway.router)
-app.include_router(progress.router)
-app.include_router(learning_outcomes.router)
+app.include_router(content.router, prefix="/api/v1")
+app.include_router(agents.router, prefix="/api/v1")
+app.include_router(vector_store.router, prefix="/api/v1")
+app.include_router(analysis.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(pathway.router, prefix="/api/v1")
+app.include_router(progress.router, prefix="/api/v1")
+app.include_router(learning_outcomes.router, prefix="/api/v1")
 
 # Documentation service link
 @app.get("/docs", tags=["system"])

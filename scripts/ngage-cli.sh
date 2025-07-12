@@ -1,0 +1,829 @@
+#!/bin/bash
+set -e
+
+# ngage-cli.sh - Unified CLI for all ngage operations
+# Usage: ./scripts/ngage-cli.sh <command> [options]
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# Load configuration
+load_config() {
+    local env=${1:-local}
+    
+    if [ "$env" = "local" ]; then
+        # Local development configuration
+        export AWS_PROFILE=""
+        export AWS_REGION=""
+        export ECR_REPOSITORY_URL=""
+        export ECS_CLUSTER=""
+        export PRIVATE_SUBNETS=""
+        export ECS_SECURITY_GROUP=""
+        export SECRETS_ARN=""
+        export IS_LOCAL=true
+        log_info "Using local development environment"
+        return
+    fi
+    
+    # AWS environment configuration
+    local config_file="$PROJECT_ROOT/infra/environments/$env/terraform.tfvars"
+    
+    if [ ! -f "$config_file" ]; then
+        log_error "Configuration file not found: $config_file"
+        exit 1
+    fi
+    
+    export AWS_PROFILE=$(grep '^aws_profile' "$config_file" | cut -d'=' -f2 | tr -d ' "' || echo "default")
+    export AWS_REGION=$(grep '^aws_region' "$config_file" | cut -d'=' -f2 | tr -d ' "' || echo "us-west-2")
+    export IS_LOCAL=false
+    
+    # Get infrastructure outputs with AWS profile
+    cd "$PROJECT_ROOT/infra/environments/$env"
+    
+    # Set AWS profile for terraform
+    export AWS_PROFILE="$AWS_PROFILE"
+    
+    export ECR_REPOSITORY_URL=$(AWS_PROFILE="$AWS_PROFILE" terraform output -raw ecr_repository_url 2>/dev/null || echo "")
+    export ECS_CLUSTER="${env}-curriculum-cluster"
+    export PRIVATE_SUBNETS=$(AWS_PROFILE="$AWS_PROFILE" terraform output -json private_subnet_ids 2>/dev/null | jq -r 'join(",")' || echo "")
+    export ECS_SECURITY_GROUP=$(AWS_PROFILE="$AWS_PROFILE" terraform output -raw ecs_security_group_id 2>/dev/null || echo "")
+    export SECRETS_ARN=$(AWS_PROFILE="$AWS_PROFILE" terraform output -raw secrets_arn 2>/dev/null || echo "")
+    
+    # Validate required values
+    if [ -z "$PRIVATE_SUBNETS" ] || [ -z "$ECS_SECURITY_GROUP" ]; then
+        log_error "Missing required infrastructure outputs. Ensure terraform apply has been run."
+        log_info "Private Subnets: '$PRIVATE_SUBNETS'"
+        log_info "Security Group: '$ECS_SECURITY_GROUP'"
+        exit 1
+    fi
+    
+    cd "$PROJECT_ROOT"
+}
+
+# Verify AWS credentials
+verify_aws() {
+    if [ "$IS_LOCAL" = true ]; then
+        log_info "Skipping AWS verification for local environment"
+        return
+    fi
+    
+    local account_id=$(aws sts get-caller-identity --profile "$AWS_PROFILE" --region "$AWS_REGION" --output text --query 'Account' 2>/dev/null || echo "ERROR")
+    if [ "$account_id" = "ERROR" ]; then
+        log_error "AWS profile '$AWS_PROFILE' is not valid"
+        exit 1
+    fi
+    log_info "Using AWS Account: $account_id (Profile: $AWS_PROFILE, Region: $AWS_REGION)"
+}
+
+# Infrastructure commands
+cmd_deploy() {
+    local env=${1:-sandbox}
+    log_info "Deploying infrastructure to $env environment"
+    
+    cd "$PROJECT_ROOT/terraform/environments/$env"
+    
+    if [ ! -f "terraform.tfvars" ]; then
+        log_error "terraform.tfvars not found. Copy from terraform.tfvars.example"
+        exit 1
+    fi
+    
+    terraform init -reconfigure
+    terraform plan -out=tfplan
+    
+    echo "Review the plan above. Press Enter to continue or Ctrl+C to cancel..."
+    read -r
+    
+    terraform apply tfplan
+    log_success "Infrastructure deployed successfully"
+}
+
+cmd_secrets() {
+    local env=${1:-sandbox}
+    local openai_key=""
+    local anthropic_key=""
+    local non_interactive=false
+    
+    # Parse arguments
+    shift
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --openai-key) openai_key="$2"; shift 2 ;;
+            --anthropic-key) anthropic_key="$2"; shift 2 ;;
+            --non-interactive) non_interactive=true; shift ;;
+            *) shift ;;
+        esac
+    done
+    
+    load_config "$env"
+    verify_aws
+    
+    log_info "Updating secrets for $env environment"
+    
+    # Get current secrets
+    local current_secrets=$(aws secretsmanager get-secret-value \
+        --secret-id "$SECRETS_ARN" \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query 'SecretString' \
+        --output text)
+    
+    local app_secret=$(echo "$current_secrets" | jq -r '.secret_key')\n    local postgres_password=$(echo "$current_secrets" | jq -r '.postgres_password')\n    local redis_token=$(echo "$current_secrets" | jq -r '.redis_auth_token')
+    
+    # Get API keys
+    if [ -z "$openai_key" ]; then
+        if [ "$non_interactive" = true ]; then
+            openai_key=${OPENAI_API_KEY:-}
+            if [ -z "$openai_key" ]; then
+                log_error "OpenAI API key required (use --openai-key or OPENAI_API_KEY env var)"
+                exit 1
+            fi
+        else
+            echo -n "Enter OpenAI API key: "
+            read -s openai_key
+            echo
+        fi
+    fi
+    
+    if [ -z "$anthropic_key" ]; then
+        if [ "$non_interactive" = true ]; then
+            anthropic_key=${ANTHROPIC_API_KEY:-}
+            if [ -z "$anthropic_key" ]; then
+                log_error "Anthropic API key required (use --anthropic-key or ANTHROPIC_API_KEY env var)"
+                exit 1
+            fi
+        else
+            echo -n "Enter Anthropic API key: "
+            read -s anthropic_key
+            echo
+        fi
+    fi
+    
+    # Update secrets
+    cd "$PROJECT_ROOT/infra/secrets-update"
+    
+    cat > terraform.tfvars << EOF
+aws_region = "$AWS_REGION"
+aws_profile = "$AWS_PROFILE"
+secrets_manager_arn = "$SECRETS_ARN"
+openai_api_key = "$openai_key"
+anthropic_api_key = "$anthropic_key"
+app_secret_key = "$app_secret"
+postgres_password = "$postgres_password"
+redis_auth_token = "$redis_token"
+EOF
+    
+    terraform init -reconfigure -input=false
+    terraform apply -auto-approve
+    rm -f terraform.tfvars
+    
+    log_success "Secrets updated successfully"
+}
+
+build_frontend() {
+    local env=$1
+    
+    log_info "Building frontend for $env environment using Docker"
+    
+    if [ "$env" = "local" ]; then
+        log_info "Building frontend locally (no deployment)"
+        cd "$PROJECT_ROOT"
+        
+        # Build using multi-stage Dockerfile frontend stage
+        docker build --target frontend-builder -f Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=http://localhost:8001 \
+            -t curriculum-frontend:latest .
+        
+        # Extract build output
+        mkdir -p "$PROJECT_ROOT/frontend/out"
+        docker run --rm -v "$PROJECT_ROOT/frontend/out:/output" curriculum-frontend:latest sh -c "cp -r out/* /output/ 2>/dev/null || cp -r .next/static /output/ 2>/dev/null || echo 'Build output copied'"
+        
+        log_success "Frontend built locally in frontend/out/"
+        return
+    fi
+    
+    # AWS deployment
+    load_config "$env"
+    verify_aws
+    
+    # Get S3 bucket from terraform output
+    local bucket_name=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw frontend_bucket_name 2>/dev/null)
+    
+    if [ -z "$bucket_name" ]; then
+        log_error "Could not get frontend bucket name from terraform output"
+        return 1
+    fi
+    
+    log_info "Target bucket: $bucket_name"
+    
+    # Build using Docker for consistency
+    cd "$PROJECT_ROOT"
+    
+    log_info "Building frontend with Docker..."
+    # Get ALB DNS name from terraform output
+    local alb_dns=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw alb_dns_name 2>/dev/null)
+    
+    if [ -z "$alb_dns" ]; then
+        log_error "Could not get ALB DNS name from terraform output"
+        return 1
+    fi
+    
+    log_info "Using API URL: http://$alb_dns"
+    docker build --target frontend-builder -f Dockerfile \
+        --build-arg NEXT_PUBLIC_API_URL="http://$alb_dns" \
+        -t curriculum-frontend:latest .
+    
+    # Extract build output to local directory for S3 sync
+    mkdir -p "$PROJECT_ROOT/frontend/out"
+    docker run --rm -v "$PROJECT_ROOT/frontend/out:/output" curriculum-frontend:latest sh -c "cp -r out/* /output/ 2>/dev/null || cp -r .next/static /output/ 2>/dev/null || echo 'Build output extracted'"
+    
+    log_info "Deploying to S3..."
+    aws s3 sync "$PROJECT_ROOT/frontend/out/" "s3://$bucket_name/" --delete --profile "$AWS_PROFILE" --region "$AWS_REGION"
+    
+    # Invalidate CloudFront cache
+    local distribution_id=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw cloudfront_distribution_id 2>/dev/null)
+    
+    if [ -n "$distribution_id" ] && [ "$distribution_id" != "" ]; then
+        log_info "Invalidating CloudFront cache..."
+        aws cloudfront create-invalidation --distribution-id "$distribution_id" --paths "/*" --profile "$AWS_PROFILE" --region "$AWS_REGION" >/dev/null
+    fi
+    
+    log_success "Frontend deployed successfully"
+}
+
+build_frontend_inspect() {
+    local env=$1
+    
+    log_info "Building frontend for inspection (env: $env)"
+    
+    # Get ALB DNS name from terraform output if not local
+    local api_url="http://localhost:8001"
+    if [ "$env" != "local" ]; then
+        load_config "$env"
+        verify_aws
+        
+        local alb_dns=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw alb_dns_name 2>/dev/null)
+        
+        if [ -n "$alb_dns" ]; then
+            api_url="http://$alb_dns"
+            log_info "Using API URL: $api_url"
+        fi
+    fi
+    
+    cd "$PROJECT_ROOT"
+    
+    log_info "Building frontend with Docker for inspection..."
+    docker build --target frontend-builder -f Dockerfile \
+        --build-arg NEXT_PUBLIC_API_URL="$api_url" \
+        -t curriculum-frontend-inspect:latest .
+    
+    # Extract build output to local directory for inspection
+    local inspect_dir="$PROJECT_ROOT/frontend-inspect"
+    mkdir -p "$inspect_dir"
+    
+    log_info "Extracting build files to $inspect_dir"
+    docker run --rm -v "$inspect_dir:/output" curriculum-frontend-inspect:latest sh -c "cp -r out/* /output/ 2>/dev/null || cp -r .next/static /output/ 2>/dev/null || echo 'Build output extracted'"
+    
+    log_success "Frontend built for inspection in: $inspect_dir"
+    log_info "You can now inspect files like: $inspect_dir/_next/static/chunks/pages/*.js"
+}
+
+build_local_image() {
+    local image_name=$1
+    local increment_type=$2
+    
+    local dockerfile="Dockerfile"
+    case $image_name in
+        "curriculum-migrate") dockerfile="Dockerfile.migrate" ;;
+        "curriculum-docs") dockerfile="Dockerfile.docs" ;;
+    esac
+    
+    local version="v1.0.0-dev"
+    
+    log_info "Building $image_name locally with Dockerfile: $dockerfile"
+    log_info "Local tags: latest and $version"
+    
+    # Build image for local use
+    docker build -f "$dockerfile" -t "$image_name:latest" -t "$image_name:$version" "$PROJECT_ROOT"
+    
+    log_success "Local image built: $image_name:latest"
+    log_success "Local image built: $image_name:$version"
+}
+
+get_next_version() {
+    local image_name=$1
+    local increment_type=$2
+    local repo_url=$3
+    
+    # Get repository name from URL
+    local repo_name=$(basename "$repo_url" | cut -d: -f1)
+    
+    # Get latest semantic version from ECR
+    local latest_version=$(aws ecr describe-images \
+        --repository-name "$repo_name" \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query "imageDetails[].imageTags[]" \
+        --output text 2>/dev/null | \
+        grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | \
+        sed "s/v//" | \
+        sort -V | tail -n1)
+    
+    if [ -z "$latest_version" ]; then
+        echo "v1.0.0"
+        return
+    fi
+    
+    local major=$(echo $latest_version | cut -d. -f1)
+    local minor=$(echo $latest_version | cut -d. -f2)
+    local patch=$(echo $latest_version | cut -d. -f3)
+    
+    case $increment_type in
+        "major")
+            echo "v$((major + 1)).0.0"
+            ;;
+        "minor")
+            echo "v$major.$((minor + 1)).0"
+            ;;
+        "patch"|*)
+            echo "v$major.$minor.$((patch + 1))"
+            ;;
+    esac
+}
+
+build_image_stage() {
+    local image_name=$1
+    local stage_name=$2
+    local increment_type=$3
+    local repo_url=$4
+    
+    local version=$(get_next_version "$image_name" "$increment_type" "$repo_url")
+    
+    log_info "Building $image_name (stage: $stage_name) with version $version"
+    
+    # Build specific stage from multi-stage Dockerfile
+    docker build --target "$stage_name" -f "Dockerfile" -t "$image_name:latest" -t "$image_name:$version" "$PROJECT_ROOT"
+    
+    # Tag for ECR
+    docker tag "$image_name:latest" "$repo_url:latest"
+    docker tag "$image_name:$version" "$repo_url:$version"
+    
+    # Push both tags
+    docker push "$repo_url:latest"
+    docker push "$repo_url:$version"
+    
+    log_success "Image pushed: $repo_url:latest"
+    log_success "Image pushed: $repo_url:$version"
+}
+
+build_image() {
+    local image_name=$1
+    local dockerfile=$2
+    local increment_type=$3
+    local repo_url=$4
+    
+    local version=$(get_next_version "$image_name" "$increment_type" "$repo_url")
+    
+    log_info "Building $image_name with Dockerfile: $dockerfile"
+    log_info "Tags: latest and $version"
+    
+    # Build image with both tags (following your exact format)
+    docker build -f "$dockerfile" -t "$image_name:latest" -t "$image_name:$version" "$PROJECT_ROOT"
+    
+    # Tag for ECR (following your exact format)
+    docker tag "$image_name:latest" "$repo_url:latest"
+    docker tag "$image_name:$version" "$repo_url:$version"
+    
+    # Push both tags (following your exact format)
+    docker push "$repo_url:latest"
+    docker push "$repo_url:$version"
+    
+    log_success "Image pushed: $repo_url:latest"
+    log_success "Image pushed: $repo_url:$version"
+}
+
+cmd_build() {
+    local env=${1:-local}
+    local image_name=${2:-curriculum-api}
+    local increment_type=${3:-patch}
+    
+    # Handle local builds differently
+    if [ "$env" = "local" ]; then
+        build_local_image "$image_name" "$increment_type"
+        return
+    fi
+    
+    load_config "$env"
+    verify_aws
+    
+    if [ -z "$ECR_REPOSITORY_URL" ]; then
+        log_error "ECR repository URL not found. Deploy infrastructure first."
+        exit 1
+    fi
+    
+    # Get repository URLs from terraform output first
+    local api_repo_url=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw curriculum_api_repository_url 2>/dev/null)
+    local migrate_repo_url=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw curriculum_migrate_repository_url 2>/dev/null)
+    local docs_repo_url=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw curriculum_docs_repository_url 2>/dev/null)
+    
+    # Validate we got the repository URLs
+    if [ -z "$api_repo_url" ] || [ -z "$migrate_repo_url" ] || [ -z "$docs_repo_url" ]; then
+        log_error "Failed to get ECR repository URLs from terraform output"
+        log_info "API repo: '$api_repo_url'"
+        log_info "Migrate repo: '$migrate_repo_url'"
+        log_info "Docs repo: '$docs_repo_url'"
+        exit 1
+    fi
+    
+    # Authenticate with ECR (use any repo URL to get the registry)
+    local ecr_registry=$(echo "$api_repo_url" | cut -d'/' -f1)
+    log_info "Authenticating with ECR registry: $ecr_registry"
+    aws ecr get-login-password --region "$AWS_REGION" --profile "$AWS_PROFILE" | \
+        docker login --username AWS --password-stdin "$ecr_registry"
+    
+    case $image_name in
+        "curriculum-api")
+            build_image_stage "curriculum-api" "api" "$increment_type" "$api_repo_url"
+            ;;
+        "curriculum-migrate")
+            build_image_stage "curriculum-migrate" "migrate" "$increment_type" "$migrate_repo_url"
+            ;;
+        "curriculum-docs")
+            build_image_stage "curriculum-docs" "docs" "$increment_type" "$docs_repo_url"
+            ;;
+        "frontend")
+            build_frontend "$env"
+            ;;
+        "inspect-frontend")
+            build_frontend_inspect "$env"
+            ;;
+        "all")
+            build_image_stage "curriculum-api" "api" "$increment_type" "$api_repo_url"
+            build_image_stage "curriculum-migrate" "migrate" "$increment_type" "$migrate_repo_url"
+            build_image_stage "curriculum-docs" "docs" "$increment_type" "$docs_repo_url"
+            build_frontend "$env"
+            ;;
+        *)
+            log_error "Unknown image: $image_name"
+            log_info "Available images: curriculum-api, curriculum-migrate, curriculum-docs, frontend, inspect-frontend, all"
+            exit 1
+            ;;
+    esac
+}
+
+cmd_migrate() {
+    local env=${1:-local}
+    
+    load_config "$env"
+    verify_aws
+    
+    log_info "Running database migration"
+    
+    if [ "$IS_LOCAL" = true ]; then
+        # Local development migration
+        log_info "Running local database migration via Docker Compose"
+        cd "$PROJECT_ROOT"
+        
+        if ! docker compose ps postgres | grep -q "Up"; then
+            log_error "PostgreSQL container is not running. Start with: docker compose up -d postgres"
+            exit 1
+        fi
+        
+        docker compose run --rm app python scripts/migrate.py
+        log_success "Local database migration completed successfully"
+    else
+        # AWS ECS migration
+        local task_arn=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "${env}-curriculum-db-migrate" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$PRIVATE_SUBNETS],securityGroups=[$ECS_SECURITY_GROUP],assignPublicIp=DISABLED}" \
+            --profile "$AWS_PROFILE" \
+            --region "$AWS_REGION" \
+            --query 'tasks[0].taskArn' \
+            --output text)
+        
+        log_info "Migration task started: $task_arn"
+        
+        aws ecs wait tasks-stopped \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$task_arn" \
+            --profile "$AWS_PROFILE" \
+            --region "$AWS_REGION"
+        
+        local exit_code=$(aws ecs describe-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$task_arn" \
+            --profile "$AWS_PROFILE" \
+            --region "$AWS_REGION" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+        
+        if [ "$exit_code" = "0" ]; then
+            log_success "Database migration completed successfully"
+        else
+            log_error "Database migration failed with exit code: $exit_code"
+            exit 1
+        fi
+    fi
+}
+
+cmd_docs() {
+    local env=${1:-sandbox}
+    
+    load_config "$env"
+    verify_aws
+    
+    log_info "Building and deploying documentation"
+    
+    local task_arn=$(aws ecs run-task \
+        --cluster "$ECS_CLUSTER" \
+        --task-definition "${env}-curriculum-docs-build" \
+        --launch-type FARGATE \
+        --network-configuration "awsvpcConfiguration={subnets=[$PRIVATE_SUBNETS],securityGroups=[$ECS_SECURITY_GROUP],assignPublicIp=DISABLED}" \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query 'tasks[0].taskArn' \
+        --output text)
+    
+    log_info "Docs build task started: $task_arn"
+    
+    aws ecs wait tasks-stopped \
+        --cluster "$ECS_CLUSTER" \
+        --tasks "$task_arn" \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION"
+    
+    local exit_code=$(aws ecs describe-tasks \
+        --cluster "$ECS_CLUSTER" \
+        --tasks "$task_arn" \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query 'tasks[0].containers[0].exitCode' \
+        --output text)
+    
+    if [ "$exit_code" = "0" ]; then
+        log_success "Documentation build completed successfully"
+        log_info "Documentation available at: https://$(cd "$PROJECT_ROOT/terraform/environments/$env" && terraform output -raw frontend_url)/docs/"
+    else
+        log_error "Documentation build failed with exit code: $exit_code"
+        exit 1
+    fi
+}
+
+cmd_seed() {
+    local env=${1:-local}
+    local data_type=${2:-all}
+    
+    load_config "$env"
+    
+    log_info "Seeding database with $data_type data"
+    
+    if [ "$IS_LOCAL" = true ]; then
+        cd "$PROJECT_ROOT"
+        
+        if ! docker compose ps postgres | grep -q "Up"; then
+            log_error "PostgreSQL container is not running. Start with: docker compose up -d postgres"
+            exit 1
+        fi
+        
+        case $data_type in
+            "pathway")
+                docker compose run --rm app python scripts/generate_pathway_data.py
+                ;;
+            "progress")
+                docker compose run --rm app python scripts/generate_content_progress.py
+                ;;
+            "all")
+                docker compose run --rm app python scripts/seed_data.py
+                ;;
+            *)
+                log_error "Unknown data type: $data_type. Use: pathway, progress, all"
+                exit 1
+                ;;
+        esac
+        
+        log_success "Local database seeded successfully"
+    else
+        log_warn "Remote seeding not implemented. Use local environment for data generation."
+        exit 1
+    fi
+}
+
+cmd_dev() {
+    local action=${1:-start}
+    
+    cd "$PROJECT_ROOT"
+    
+    case $action in
+        "start")
+            log_info "Starting full development environment"
+            docker compose up -d
+            ;;
+        "stop")
+            log_info "Stopping development environment"
+            docker compose down
+            ;;
+        "clean")
+            log_info "Cleaning development environment"
+            docker compose down -v
+            docker system prune -f
+            ;;
+        "logs")
+            docker compose logs -f app
+            ;;
+        "shell")
+            docker compose exec app bash
+            ;;
+        *)
+            log_error "Unknown dev action: $action. Use: start, stop, clean, logs, shell"
+            exit 1
+            ;;
+    esac
+}
+
+cmd_logs() {
+    local env=${1:-sandbox}
+    local service=${2:-migrate}
+    
+    load_config "$env"
+    verify_aws
+    
+    if [ "$IS_LOCAL" = true ]; then
+        log_info "Showing local Docker logs for $service"
+        cd "$PROJECT_ROOT"
+        docker compose logs -f "$service" 2>/dev/null || docker compose logs -f app
+        return
+    fi
+    
+    log_info "Fetching CloudWatch logs for $service"
+    
+    local log_group="/ecs/sandbox-curriculum-api"
+    local log_stream_prefix
+    
+    case $service in
+        "migrate"|"db-migrate")
+            log_stream_prefix="db-migrate"
+            ;;
+        "docs"|"docs-build")
+            log_stream_prefix="docs-build"
+            ;;
+        "api")
+            log_stream_prefix="ecs"
+            ;;
+        *)
+            log_stream_prefix="$service"
+            ;;
+    esac
+    
+    # Get most recent log stream for the service
+    local latest_stream=$(aws logs describe-log-streams \
+        --log-group-name "$log_group" \
+        --order-by LastEventTime \
+        --descending \
+        --max-items 1 \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query "logStreams[?contains(logStreamName, '$log_stream_prefix')].logStreamName" \
+        --output text 2>/dev/null)
+    
+    if [ -z "$latest_stream" ] || [ "$latest_stream" = "None" ]; then
+        log_error "No recent log streams found for $service"
+        log_info "Use this command to see all streams:"
+        echo "aws logs describe-log-streams --log-group-name '$log_group' --profile '$AWS_PROFILE' --region '$AWS_REGION' --query 'logStreams[].logStreamName' --output table"
+        return 1
+    fi
+    
+    log_info "Showing recent logs from: $latest_stream"
+    
+    aws logs get-log-events \
+        --log-group-name "$log_group" \
+        --log-stream-name "$latest_stream" \
+        --start-time $(($(date +%s) * 1000 - 3600000)) \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query 'events[].[timestamp,message]' \
+        --output table
+}
+
+cmd_test_db() {
+    local env=${1:-sandbox}
+    
+    load_config "$env"
+    verify_aws
+    
+    if [ "$IS_LOCAL" = true ]; then
+        log_info "Testing local database connection"
+        cd "$PROJECT_ROOT"
+        docker compose run --rm app python scripts/test_db_connection.py
+        return
+    fi
+    
+    log_info "Testing database connectivity via ECS task"
+    
+    # Run test using the migration task definition with different command
+    local task_arn=$(aws ecs run-task \
+        --cluster "$ECS_CLUSTER" \
+        --task-definition "${env}-curriculum-db-migrate" \
+        --launch-type FARGATE \
+        --network-configuration "awsvpcConfiguration={subnets=[$PRIVATE_SUBNETS],securityGroups=[$ECS_SECURITY_GROUP],assignPublicIp=DISABLED}" \
+        --overrides '{"containerOverrides":[{"name":"db-migrate","command":["python","scripts/test_db_connection.py"]}]}' \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query 'tasks[0].taskArn' \
+        --output text)
+    
+    log_info "DB test task started: $task_arn"
+    
+    aws ecs wait tasks-stopped \
+        --cluster "$ECS_CLUSTER" \
+        --tasks "$task_arn" \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION"
+    
+    local exit_code=$(aws ecs describe-tasks \
+        --cluster "$ECS_CLUSTER" \
+        --tasks "$task_arn" \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" \
+        --query 'tasks[0].containers[0].exitCode' \
+        --output text)
+    
+    if [ "$exit_code" = "0" ]; then
+        log_success "Database connectivity test passed"
+    else
+        log_error "Database connectivity test failed with exit code: $exit_code"
+        log_info "Check logs with: $0 logs $env migrate"
+    fi
+}
+
+cmd_help() {
+    cat << EOF
+ngage CLI - Unified command interface
+
+Usage: $0 <command> [environment] [options]
+
+Commands:
+  deploy [env]                 Deploy infrastructure (AWS only)
+  secrets [env] [options]      Update API secrets (AWS only)
+    --openai-key KEY           OpenAI API key
+    --anthropic-key KEY        Anthropic API key  
+    --non-interactive          Non-interactive mode
+  build [env] [image] [increment] Build and push Docker image or frontend
+    Env: local (build only), sandbox, production
+    Images: curriculum-api, curriculum-migrate, curriculum-docs, frontend, inspect-frontend, all
+    Increment: patch, minor, major (Docker images only)
+  migrate [env]               Run database migration (local|AWS)
+  docs [env]                  Build and deploy documentation (local|AWS)
+  seed [env] [type]           Generate test data (local only)
+    Types: pathway, progress, all
+  dev [action]                Development environment management
+    Actions: start, stop, clean, logs, shell
+  logs [env] [service]        Show logs for service (migrate, docs, api)
+  test-db [env]               Test database connectivity
+  help                        Show this help
+
+Environments:
+  local                       Local Docker development (default)
+  sandbox                     AWS sandbox environment
+  production                  AWS production environment
+
+Examples:
+  $0 migrate                  # Local migration
+  $0 migrate sandbox          # AWS migration
+  $0 test-db sandbox          # Test database connection
+  $0 logs sandbox migrate     # Show migration logs
+  $0 seed local pathway       # Generate pathway data locally
+  $0 dev start               # Start local development
+  $0 deploy sandbox          # Deploy to AWS
+  $0 secrets sandbox --openai-key "sk-..." --anthropic-key "sk-..."
+
+Local commands work with Docker Compose, AWS commands require infra configuration.
+EOF
+}
+
+# Main command dispatcher
+case "${1:-help}" in
+    deploy) cmd_deploy "${2:-sandbox}" ;;
+    secrets) cmd_secrets "${2:-sandbox}" "${@:3}" ;;
+    build) cmd_build "${2:-sandbox}" "${3:-curriculum-api}" "${4:-patch}" ;;
+    migrate) cmd_migrate "${2:-local}" ;;
+    docs) cmd_docs "${2:-local}" ;;
+    seed) cmd_seed "${2:-local}" "${3:-all}" ;;
+    dev) cmd_dev "${2:-start}" ;;
+    logs) cmd_logs "${2:-sandbox}" "${3:-migrate}" ;;
+    test-db) cmd_test_db "${2:-sandbox}" ;;
+    help|--help|-h) cmd_help ;;
+    *) log_error "Unknown command: $1"; cmd_help; exit 1 ;;
+esac

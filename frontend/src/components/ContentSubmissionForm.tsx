@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { apiClient } from '@/lib/api';
+import { buildApiUrl } from '../config/api';
 import { ContentSubmissionRequest, ContentSubmissionResponse } from '@/types/api';
 
 interface SimilarContent {
@@ -57,7 +58,7 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
     setError(null);
     
     try {
-      const response = await fetch('http://localhost:8001/api/v1/vector/search', {
+      const response = await fetch(buildApiUrl('vector/search'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,7 +104,7 @@ export default function ContentSubmissionForm({ onSubmissionStart, onSubmissionC
 
     try {
       // Submit to the agentic workflow endpoint
-      const response = await fetch('http://localhost:8001/api/v1/agents/process-content', {
+      const response = await fetch(buildApiUrl('agents/process-content'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

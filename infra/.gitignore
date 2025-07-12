@@ -1,0 +1,12 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+tfplan
+
+# IDE
+.vscode/
+.idea/

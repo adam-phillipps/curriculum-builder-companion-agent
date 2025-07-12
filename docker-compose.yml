@@ -5,12 +5,13 @@ services:
   docs:
     build:
       context: .
-      dockerfile: Dockerfile.docs
+      dockerfile: Dockerfile
+      target: docs
     ports:
       - "8080:8080"
     volumes:
-      - ./docs:/docs/docs:ro
-      - ./mkdocs.yml:/docs/mkdocs.yml:ro
+      - ./docs:/app/docs:ro
+      - ./mkdocs.yml:/app/mkdocs.yml:ro
     profiles:
       - docs
 
@@ -19,19 +20,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: migrate
     environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=${CHROMA_PORT:-8000}
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - .:/app
-    entrypoint: ["./scripts/entrypoint.sh"]
-    command: ["migrate"]
     profiles:
       - migrate
 
@@ -40,12 +46,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: api
     environment:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=${CHROMA_PORT:-8000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,6 +121,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: api
     ports:
       - "8001:8000"
     environment:
@@ -141,8 +156,10 @@ services:
 
   # Next.js Frontend
   frontend:
-    image: node:18-alpine
-    working_dir: /app
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend-builder
     ports:
       - "3000:3000"
     environment:

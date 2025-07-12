@@ -1,11 +1,7 @@
 import os
 from logging.config import fileConfig
-from urllib.parse import quote_plus
-from sqlalchemy import engine_from_config, pool, create_engine
+from sqlalchemy import engine_from_config, pool
 from alembic import context
-
-# Import our models
-from src.db.database import Base
 
 # this is the Alembic Config object
 config = context.config
@@ -14,26 +10,20 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Get database URL from environment variable (AWS best practice)
+# Set the database URL from environment
 database_url = os.getenv('DATABASE_URL')
-if not database_url:
-    raise ValueError("DATABASE_URL environment variable is required")
+if database_url:
+    config.set_main_option("sqlalchemy.url", database_url)
 
-# Convert async URL to sync for Alembic
-if "postgresql+asyncpg://" in database_url:
-    database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
-
-# Store the URL for later use
-config.database_url = database_url
-
-# add your model's MetaData object here for 'autogenerate' support
-target_metadata = Base.metadata
+# Import models for autogenerate (minimal set)
+from sqlalchemy import MetaData
+target_metadata = MetaData()
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    # Use the database URL we stored earlier
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=config.database_url,
+        url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -44,9 +34,9 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    # Use the database URL we stored earlier
-    connectable = create_engine(
-        config.database_url,
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 

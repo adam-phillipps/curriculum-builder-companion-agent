@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { api } from '@/lib/api';
+import { buildApiUrl } from '../config/api';
 
 interface PathwayNode {
   id: string;
@@ -63,7 +64,7 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
       console.log('Loading pathway data for user:', userId, 'pathway:', pathwayId);
       
       // Use direct fetch to avoid API client issues
-      const response = await fetch(`http://localhost:8001/users/${userId}/content-progress`);
+      const response = await fetch(buildApiUrl(`users/${userId}/content-progress`));
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -80,7 +81,7 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
       }
       
       // Get content details to extract learning outcomes
-      const contentResponse = await fetch('http://localhost:8001/api/v1/content');
+      const contentResponse = await fetch(buildApiUrl('content'));
       const allContent = await contentResponse.json();
       
       // Define tree structure with proper prerequisites

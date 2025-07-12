@@ -1,11 +1,10 @@
+import { buildApiUrl } from '../config/api';
+
 // API client with proper error handling for Docker environment
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? '/api' 
-  : 'http://localhost:8001';
 
 export class ApiClient {
   static async makeRequest(endpoint: string, options: RequestInit = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = buildApiUrl(endpoint);
     
     const defaultOptions: RequestInit = {
       headers: {
@@ -44,7 +43,7 @@ export class ApiClient {
     max_results?: number;
     search_approved_only?: boolean;
   }) {
-    return this.makeRequest('/v1/vector/search', {
+    return this.makeRequest('vector/search', {
       method: 'POST',
       body: JSON.stringify({
         query_text: '',
@@ -57,7 +56,7 @@ export class ApiClient {
   }
 
   static async getContent(contentId: number) {
-    return this.makeRequest(`/v1/content/${contentId}`);
+    return this.makeRequest(`content/${contentId}`);
   }
 
   static async getContentList(params: {
@@ -69,13 +68,13 @@ export class ApiClient {
     if (params.offset) queryParams.append('offset', params.offset.toString());
     
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/v1/content?${queryString}` : '/v1/content';
+    const endpoint = queryString ? `content?${queryString}` : 'content';
     
     return this.makeRequest(endpoint);
   }
 
   static async submitContent(data: any) {
-    return this.makeRequest('/v1/agents/process-content', {
+    return this.makeRequest('agents/process-content', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -83,26 +82,26 @@ export class ApiClient {
 
   // User API methods
   static async getUsers() {
-    return this.makeRequest('/users/');
+    return this.makeRequest('users/');
   }
 
   static async getAvailableRoles() {
-    return this.makeRequest('/users/roles/available');
+    return this.makeRequest('users/roles/available');
   }
 
   static async signInUser(userId: number) {
-    return this.makeRequest('/users/sign-in', {
+    return this.makeRequest('users/sign-in', {
       method: 'POST',
       body: JSON.stringify({ user_id: userId }),
     });
   }
 
   static async getLearnerProfile(userId: number) {
-    return this.makeRequest(`/users/${userId}/learner-profile`);
+    return this.makeRequest(`users/${userId}/learner-profile`);
   }
 
   static async getUserContentProgress(userId: number) {
-    return this.makeRequest(`/users/${userId}/content-progress`);
+    return this.makeRequest(`users/${userId}/content-progress`);
   }
 }
 
