@@ -4,6 +4,24 @@ site_url: https://curriculum-builder.example.com
 
 nav:
   - Home: index.md
+  - Getting Started: product/getting-started.md
+  - User Guides:
+    - Learners: product/user-guides/learners.md
+    - Builders: product/user-guides/builders.md
+    - Educators: product/user-guides/educators.md
+    - Administrators: product/user-guides/administrators.md
+  - Features:
+    - Learning Outcomes: product/features/learning-outcomes.md
+    - Gap Analysis: product/features/gap-analysis.md
+    - Progress Tracking: product/features/progress-tracking.md
+  - Technical:
+    - API Reference: technical/api-reference.md
+    - Deployment: technical/deployment.md
+  - Tutorials:
+    - Quick Start: tutorials/quick-start.md
+  - Development:
+    - Gap Analysis Feature: gap_analysis_feature.md
+    - Gap Analysis Testing: gap_analysis_testing.md
 
 theme:
   name: material
