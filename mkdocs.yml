@@ -1,75 +1,18 @@
-site_name: Curriculum Builder Companion Agent
-site_description: AI-powered curriculum building and analysis platform for educators
-site_url: http://localhost:8001/docs
-repo_url: https://github.com/your-org/curriculum-builder-companion-agent
-repo_name: curriculum-builder-companion-agent
+site_name: Curriculum Builder Documentation
+site_description: AI-powered curriculum building platform
+site_url: https://curriculum-builder.example.com
+
+nav:
+  - Home: index.md
 
 theme:
   name: material
   palette:
-    - scheme: default
-      primary: blue
-      accent: blue
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    - scheme: slate
-      primary: blue
-      accent: blue
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
-  features:
-    - navigation.tabs
-    - navigation.sections
-    - navigation.expand
-    - navigation.top
-    - search.highlight
-    - content.code.copy
-
-nav:
-  - Home: index.md
-  - Product Documentation:
-    - Getting Started: product/getting-started.md
-    - User Guides:
-      - For Educators: product/user-guides/educators.md
-      - For Learners: product/user-guides/learners.md
-      - For Content Builders: product/user-guides/builders.md
-      - For Administrators: product/user-guides/administrators.md
-    - Features:
-      - Learning Outcomes: product/features/learning-outcomes.md
-      - Progress Tracking: product/features/progress-tracking.md
-      - Interactive Learning Graph: product/features/learning-graph.md
-      - Content Builder: product/features/content-builder.md
-      - Gap Analysis: product/features/gap-analysis.md
-    - Use Cases: product/use-cases.md
-  - Technical Documentation:
-    - API Reference: technical/api-reference.md
-    - Architecture: technical/architecture.md
-    - Database Schema: technical/database.md
-    - Deployment: technical/deployment.md
-    - Contributing: technical/contributing.md
-  - Tutorials:
-    - Quick Start: tutorials/quick-start.md
-    - Examples: tutorials/examples.md
-
-plugins:
-  - search
-  - mermaid2
+    primary: blue
+    accent: blue
 
 markdown_extensions:
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.tabbed:
-      alternate_style: true
   - admonition
-  - pymdownx.details
-  - attr_list
-  - md_in_html
+  - codehilite
+  - toc:
+      permalink: true

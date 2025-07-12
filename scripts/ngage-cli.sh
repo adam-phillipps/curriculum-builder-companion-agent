@@ -50,15 +50,22 @@ load_config() {
     export IS_LOCAL=false
     
     # Get infrastructure outputs with AWS profile
+    log_info "Changing to terraform directory: $PROJECT_ROOT/infra/environments/$env"
     cd "$PROJECT_ROOT/infra/environments/$env"
     
     # Set AWS profile for terraform
+    log_info "Setting AWS profile: $AWS_PROFILE"
     export AWS_PROFILE="$AWS_PROFILE"
     
+    log_info "Getting ECR repository URL..."
     export ECR_REPOSITORY_URL=$(AWS_PROFILE="$AWS_PROFILE" terraform output -raw ecr_repository_url 2>/dev/null || echo "")
+    log_info "Setting ECS cluster name..."
     export ECS_CLUSTER="${env}-curriculum-cluster"
+    log_info "Getting private subnet IDs..."
     export PRIVATE_SUBNETS=$(AWS_PROFILE="$AWS_PROFILE" terraform output -json private_subnet_ids 2>/dev/null | jq -r 'join(",")' || echo "")
+    log_info "Getting ECS security group..."
     export ECS_SECURITY_GROUP=$(AWS_PROFILE="$AWS_PROFILE" terraform output -raw ecs_security_group_id 2>/dev/null || echo "")
+    log_info "Getting secrets ARN..."
     export SECRETS_ARN=$(AWS_PROFILE="$AWS_PROFILE" terraform output -raw secrets_arn 2>/dev/null || echo "")
     
     # Validate required values
@@ -69,7 +76,9 @@ load_config() {
         exit 1
     fi
     
+    log_info "Validation passed, returning to project root..."
     cd "$PROJECT_ROOT"
+    log_info "Load config complete"
 }
 
 # Verify AWS credentials
@@ -79,12 +88,14 @@ verify_aws() {
         return
     fi
     
+    log_info "Getting AWS account ID..."
     local account_id=$(aws sts get-caller-identity --profile "$AWS_PROFILE" --region "$AWS_REGION" --output text --query 'Account' 2>/dev/null || echo "ERROR")
     if [ "$account_id" = "ERROR" ]; then
         log_error "AWS profile '$AWS_PROFILE' is not valid"
         exit 1
     fi
     log_info "Using AWS Account: $account_id (Profile: $AWS_PROFILE, Region: $AWS_REGION)"
+    log_info "AWS verification complete"
 }
 
 # Infrastructure commands
@@ -195,6 +206,7 @@ build_frontend() {
     local env=$1
     local clear_cache=${2:-false}
     
+    log_info "=== STARTING build_frontend function ==="
     log_info "Building frontend for $env environment using Docker"
     
     if [ "$env" = "local" ]; then
@@ -214,11 +226,13 @@ build_frontend() {
         return
     fi
     
-    # AWS deployment
+    # AWS deployment - need to load config for S3 operations
+    log_info "Loading configuration for AWS deployment..."
     load_config "$env"
     verify_aws
     
     # Get S3 bucket from terraform output
+    log_info "Getting S3 bucket name from terraform..."
     local bucket_name=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw frontend_bucket_name 2>/dev/null)
     
     if [ -z "$bucket_name" ]; then
@@ -234,24 +248,33 @@ build_frontend() {
     log_info "Building frontend with Docker..."
     # Get API Gateway URL or ALB DNS name for API calls
     # Get API URL from terraform output (handles HTTPS/HTTP automatically)
+    log_info "Getting API URL from terraform..."
     local api_url=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw api_url 2>/dev/null)
     
     if [ -z "$api_url" ]; then
         log_error "Could not get API URL from terraform output"
         return 1
     fi
+    log_info "Got API URL: $api_url"
     
     log_info "Using API URL: $api_url"
+    log_info "Starting Docker build..."
     docker build --target frontend-builder -f Dockerfile \
         --build-arg NEXT_PUBLIC_API_URL="$api_url" \
-        -t curriculum-frontend:latest .
+        -t curriculum-frontend:latest . || {
+        log_error "Docker build failed"
+        return 1
+    }
+    log_info "Docker build completed"
     
     # Extract build output to local directory for S3 sync
     mkdir -p "$PROJECT_ROOT/frontend/out"
     docker run --rm -v "$PROJECT_ROOT/frontend/out:/output" curriculum-frontend:latest sh -c "cp -r out/* /output/ 2>/dev/null || cp -r .next/static /output/ 2>/dev/null || echo 'Build output extracted'"
     
     log_info "Deploying to S3..."
-    aws s3 sync "$PROJECT_ROOT/frontend/out/" "s3://$bucket_name/" --delete --profile "$AWS_PROFILE" --region "$AWS_REGION"
+    log_info "Using AWS region: '$AWS_REGION'"
+    log_info "Using AWS profile: '$AWS_PROFILE'"
+    AWS_PROFILE="$AWS_PROFILE" aws s3 sync "$PROJECT_ROOT/frontend/out/" "s3://$bucket_name/" --delete --region "$AWS_REGION"
     
     # Invalidate CloudFront cache if requested or always for deployment
     local distribution_id=$(cd "$PROJECT_ROOT/infra/environments/$env" && terraform output -raw cloudfront_distribution_id 2>/dev/null)
@@ -438,10 +461,52 @@ build_image() {
     log_success "Image pushed: $repo_url:$version"
 }
 
+restart_ecs_service() {
+    local env=$1
+    local service_name=$2
+    
+    log_info "Restarting ECS service: $service_name"
+    
+    aws ecs update-service \
+        --cluster "${env}-curriculum-cluster" \
+        --service "$service_name" \
+        --force-new-deployment \
+        --profile "$AWS_PROFILE" \
+        --region "$AWS_REGION" >/dev/null
+    
+    log_success "ECS service restart initiated: $service_name"
+}
+
 cmd_build() {
     local env=${1:-local}
     local image_name=${2:-curriculum-api}
-    local increment_type=${3:-patch}
+    local increment_type="patch"
+    local restart_service=false
+    local clear_cache=false
+    
+    log_info "=== CMD_BUILD STARTED ==="
+    log_info "Environment: $env"
+    log_info "Image: $image_name"
+    
+    # Parse remaining arguments
+    shift 2
+    for arg in "$@"; do
+        case $arg in
+            --restart)
+                restart_service=true
+                ;;
+            --clear-cache)
+                clear_cache=true
+                ;;
+            patch|minor|major)
+                increment_type="$arg"
+                ;;
+        esac
+    done
+    
+    log_info "Increment: $increment_type"
+    log_info "Clear cache: $clear_cache"
+    log_info "Restart service: $restart_service"
     
     # Handle local builds differently
     if [ "$env" = "local" ]; then
@@ -449,6 +514,19 @@ cmd_build() {
         return
     fi
     
+    # Handle frontend builds separately (no ECR needed)
+    case $image_name in
+        "frontend")
+            build_frontend "$env" "$clear_cache"
+            return
+            ;;
+        "inspect-frontend")
+            build_frontend_inspect "$env"
+            return
+            ;;
+    esac
+    
+    # For Docker images, load config and verify AWS
     load_config "$env"
     verify_aws
     
@@ -471,7 +549,7 @@ cmd_build() {
         exit 1
     fi
     
-    # Authenticate with ECR (use any repo URL to get the registry)
+    # Authenticate with ECR (only for Docker images, not frontend)
     local ecr_registry=$(echo "$api_repo_url" | cut -d'/' -f1)
     log_info "Authenticating with ECR registry: $ecr_registry"
     aws ecr get-login-password --region "$AWS_REGION" --profile "$AWS_PROFILE" | \
@@ -480,6 +558,9 @@ cmd_build() {
     case $image_name in
         "curriculum-api")
             build_image_stage "curriculum-api" "api" "$increment_type" "$api_repo_url"
+            if [ "$restart_service" = true ]; then
+                restart_ecs_service "$env" "${env}-curriculum-api"
+            fi
             ;;
         "curriculum-migrate")
             build_image_stage "curriculum-migrate" "migrate" "$increment_type" "$migrate_repo_url"
@@ -487,21 +568,7 @@ cmd_build() {
         "curriculum-docs")
             build_image_stage "curriculum-docs" "docs" "$increment_type" "$docs_repo_url"
             ;;
-        "frontend")
-            # Check for --clear-cache flag in remaining arguments
-            local clear_cache=false
-            shift 3 # Skip env, image_name, increment_type
-            for arg in "$@"; do
-                if [ "$arg" = "--clear-cache" ]; then
-                    clear_cache=true
-                    break
-                fi
-            done
-            build_frontend "$env" "$clear_cache"
-            ;;
-        "inspect-frontend")
-            build_frontend_inspect "$env"
-            ;;
+
         "all")
             build_image_stage "curriculum-api" "api" "$increment_type" "$api_repo_url"
             build_image_stage "curriculum-migrate" "migrate" "$increment_type" "$migrate_repo_url"
@@ -628,10 +695,33 @@ cmd_docs() {
 cmd_seed() {
     local env=${1:-local}
     local data_type=${2:-all}
+    local email=""
+    local role="learner"
+    
+    # Parse additional arguments
+    shift 2
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --email)
+                email="$2"
+                shift 2
+                ;;
+            --role)
+                role="$2"
+                shift 2
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
     
     load_config "$env"
     
     log_info "Seeding database with $data_type data"
+    if [ -n "$email" ]; then
+        log_info "Target user: $email (role: $role)"
+    fi
     
     if [ "$IS_LOCAL" = true ]; then
         cd "$PROJECT_ROOT"
@@ -641,26 +731,59 @@ cmd_seed() {
             exit 1
         fi
         
-        case $data_type in
-            "pathway")
-                docker compose run --rm app python scripts/generate_pathway_data.py
-                ;;
-            "progress")
-                docker compose run --rm app python scripts/generate_content_progress.py
-                ;;
-            "all")
-                docker compose run --rm app python scripts/seed_data.py
-                ;;
-            *)
-                log_error "Unknown data type: $data_type. Use: pathway, progress, all"
-                exit 1
-                ;;
-        esac
+        # Use entrypoint script for consistency
+        local env_vars="-e SEED_DATABASE=true -e SEED_TYPE=$data_type"
+        if [ -n "$email" ]; then
+            env_vars="$env_vars -e SEED_EMAIL=$email -e SEED_ROLE=$role"
+        fi
         
+        docker compose run --rm $env_vars app seed
         log_success "Local database seeded successfully"
     else
-        log_warn "Remote seeding not implemented. Use local environment for data generation."
-        exit 1
+        # AWS ECS task execution
+        log_info "Running seed task on ECS"
+        
+        # Build environment variables for ECS task
+        local env_overrides='"environment":[{"name":"SEED_DATABASE","value":"true"},{"name":"SEED_TYPE","value":"'$data_type'"}'
+        if [ -n "$email" ]; then
+            env_overrides="$env_overrides,{\"name\":\"SEED_EMAIL\",\"value\":\"$email\"},{\"name\":\"SEED_ROLE\",\"value\":\"$role\"}"
+        fi
+        env_overrides="$env_overrides]"
+        
+        local task_arn=$(aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "${env}-curriculum-db-migrate" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[$PRIVATE_SUBNETS],securityGroups=[$ECS_SECURITY_GROUP],assignPublicIp=DISABLED}" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"db-migrate\",\"command\":[\"./scripts/entrypoint.sh\",\"seed\"],$env_overrides}]}" \
+            --profile "$AWS_PROFILE" \
+            --region "$AWS_REGION" \
+            --query 'tasks[0].taskArn' \
+            --output text)
+        
+        log_info "Seed task started: $task_arn"
+        
+        aws ecs wait tasks-stopped \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$task_arn" \
+            --profile "$AWS_PROFILE" \
+            --region "$AWS_REGION"
+        
+        local exit_code=$(aws ecs describe-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$task_arn" \
+            --profile "$AWS_PROFILE" \
+            --region "$AWS_REGION" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+        
+        if [ "$exit_code" = "0" ]; then
+            log_success "Database seeding completed successfully"
+        else
+            log_error "Database seeding failed with exit code: $exit_code"
+            log_info "Check logs with: $0 logs $env migrate"
+            exit 1
+        fi
     fi
 }
 
@@ -876,15 +999,17 @@ Commands:
     --openai-key KEY           OpenAI API key
     --anthropic-key KEY        Anthropic API key  
     --non-interactive          Non-interactive mode
-  build [env] [image] [increment] [--clear-cache] Build and push Docker image or frontend
+  build [env] [image] [increment] [--clear-cache] [--restart] Build and push Docker image or frontend
     Env: local (build only), sandbox, production
     Images: curriculum-api, curriculum-migrate, curriculum-docs, frontend, inspect-frontend, all
     Increment: patch, minor, major (Docker images only)
     --clear-cache: Force CloudFront invalidation for frontend builds
+    --restart: Force ECS service restart after build (API only)
   migrate [env]               Run database migration (local|AWS)
   docs [env]                  Build and deploy documentation (local|AWS)
-  seed [env] [type]           Generate test data (local only)
+  seed [env] [type] [options] Generate test data (local|AWS)
     Types: pathway, progress, all
+    Options: --email EMAIL --role ROLE
   dev [action]                Development environment management
     Actions: start, stop, clean, logs, shell
   logs [env] [service]        Show logs for service (migrate, docs, api)

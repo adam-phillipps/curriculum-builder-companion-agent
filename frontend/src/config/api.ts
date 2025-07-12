@@ -19,12 +19,8 @@ const getDocsBaseUrl = (): string => {
     return process.env.NEXT_PUBLIC_DOCS_URL;
   }
   
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:8080';
-  }
-  
-  // Production fallback - assume docs are served from same domain
-  return '';
+  // Always use API endpoint for docs (both dev and prod)
+  return getApiBaseUrl();
 };
 
 export const API_CONFIG = {

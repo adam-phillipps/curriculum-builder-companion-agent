@@ -34,6 +34,18 @@ resource "aws_ecr_repository" "curriculum_docs" {
   tags = var.tags
 }
 
+# ECR Repository for ChromaDB mirror
+resource "aws_ecr_repository" "chromadb_mirror" {
+  name                 = "chromadb-mirror"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = var.tags
+}
+
 # ECR Lifecycle Policies
 resource "aws_ecr_lifecycle_policy" "curriculum_api" {
   repository = aws_ecr_repository.curriculum_api.name

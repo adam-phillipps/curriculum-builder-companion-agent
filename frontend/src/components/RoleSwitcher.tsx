@@ -79,7 +79,7 @@ export default function RoleSwitcher({ currentUser, onRoleChange }: RoleSwitcher
       
       {/* Help Button */}
       <a
-        href={buildDocsUrl(`docs/product/user-guides/${currentUser.current_role === 'curriculum_architect' ? 'administrators' : currentUser.current_role}s/`)}
+        href={buildDocsUrl('api/v1/docs/')}
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-center justify-center w-8 h-8 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"

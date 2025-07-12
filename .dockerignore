@@ -23,11 +23,9 @@ nosetests.xml
 dist/
 build/
 
-# Documentation
-docs/
+# Documentation build artifacts (but keep source)
 site/
 .mkdocs/
-mkdocs.yml
 README.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md

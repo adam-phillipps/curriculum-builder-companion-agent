@@ -1,20 +1,6 @@
 # version: '3.8'
 
 services:
-  # Documentation Service (lightweight, always running)
-  docs:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: docs
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./docs:/app/docs:ro
-      - ./mkdocs.yml:/app/mkdocs.yml:ro
-    profiles:
-      - docs
-
   # Database Migration (runs once, exits)
   migrator:
     build:
@@ -149,28 +135,28 @@ services:
         condition: service_healthy
       chromadb:
         condition: service_healthy
-    volumes:
-      - .:/app
+    # Remove volume mount to preserve built docs in container
+    # volumes:
+    #   - .:/app
     entrypoint: ["./scripts/entrypoint.sh"]
     command: ["app-minimal"]  # Clean app start, no setup tasks
 
-  # Next.js Frontend
+  # Next.js Frontend Development Server
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: frontend-builder
+    image: node:18-alpine
+    working_dir: /app
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:8001
+      - NEXT_PUBLIC_DOCS_URL=http://localhost:8001
     depends_on:
       - app
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npm install && npm run dev -- --hostname 0.0.0.0"
 
 volumes:
   postgres_data:

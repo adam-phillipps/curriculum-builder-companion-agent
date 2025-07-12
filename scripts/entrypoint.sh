@@ -63,7 +63,21 @@ seed_database() {
     
     if [ "$SEED_DATABASE" = "true" ]; then
         log_info "Seeding database with test data..."
-        python scripts/generate_pathway_data.py --type complex
+        
+        # Build seed command with environment variables
+        local seed_cmd="python scripts/seed_data.py --type ${SEED_TYPE:-all}"
+        
+        if [ -n "$SEED_EMAIL" ]; then
+            seed_cmd="$seed_cmd --email $SEED_EMAIL"
+        fi
+        
+        if [ -n "$SEED_ROLE" ]; then
+            seed_cmd="$seed_cmd --role $SEED_ROLE"
+        fi
+        
+        log_info "Running: $seed_cmd"
+        $seed_cmd
+        
         if [ $? -eq 0 ]; then
             log_success "Database seeding completed"
         else
@@ -194,6 +208,9 @@ case "$1" in
         echo "  SKIP_MIGRATIONS=true   Skip database migrations"
         echo "  SKIP_SEED=true         Skip database seeding"
         echo "  SEED_DATABASE=true     Enable database seeding"
+        echo "  SEED_TYPE=all          Seed data type: all, pathway, progress, user"
+        echo "  SEED_EMAIL=email       Target user email for seeding"
+        echo "  SEED_ROLE=learner      Role for target user (default: learner)"
         echo "  BUILD_DOCS=true        Enable documentation building"
         echo "  HOST=0.0.0.0           Uvicorn host (default: 0.0.0.0)"
         echo "  PORT=8000              Uvicorn port (default: 8000)"

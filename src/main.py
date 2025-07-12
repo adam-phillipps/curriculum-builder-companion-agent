@@ -90,21 +90,20 @@ app.include_router(pathway.router, prefix="/api/v1")
 app.include_router(progress.router, prefix="/api/v1")
 app.include_router(learning_outcomes.router, prefix="/api/v1")
 
-# Documentation service link
-@app.get("/docs", tags=["system"])
-async def docs_redirect():
-    """Redirect to documentation service.
-    
-    Returns:
-        dict: Documentation service information and links
-    """
-    docs_url = f"http://{settings.DOCS_HOST}:{settings.DOCS_PORT}"
-    return {
-        "message": "Documentation Service",
-        "product_docs": docs_url,
-        "api_docs": "/api/docs",
-        "instructions": "Run 'docker compose --profile docs up -d' to start documentation service"
-    }
+# Mount documentation as static files
+if os.path.exists("/app/docs/site"):
+    app.mount("/api/v1/docs", StaticFiles(directory="/app/docs/site", html=True), name="docs")
+else:
+    # Fallback if docs not built
+    @app.get("/api/v1/docs", tags=["system"])
+    @app.get("/api/v1/docs/", tags=["system"])
+    async def docs_fallback():
+        """Documentation not available."""
+        return {
+            "message": "Documentation not built",
+            "api_docs": "/api/docs",
+            "instructions": "Documentation needs to be built during container build process"
+        }
 
 @app.get("/health", tags=["system"])
 async def health_check():
@@ -122,12 +121,11 @@ async def root():
     Returns:
         dict: API information and documentation links
     """
-    docs_url = f"http://{settings.DOCS_HOST}:{settings.DOCS_PORT}"
     return {
         "message": "Curriculum Builder Companion Agent API",
         "version": "1.0.0",
         "api_docs": "/api/docs",
         "api_docs_redoc": "/api/redoc",
-        "product_docs": docs_url,
+        "product_docs": "/docs",
         "health_check": "/health"
     }

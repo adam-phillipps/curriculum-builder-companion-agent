@@ -13,6 +13,11 @@ output "curriculum_docs_repository_url" {
   value       = aws_ecr_repository.curriculum_docs.repository_url
 }
 
+output "chromadb_mirror_repository_url" {
+  description = "ECR repository URL for ChromaDB mirror"
+  value       = aws_ecr_repository.chromadb_mirror.repository_url
+}
+
 # Backward compatibility
 output "repository_url" {
   description = "ECR repository URL for curriculum-api (main)"

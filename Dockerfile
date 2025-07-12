@@ -41,15 +41,24 @@ RUN useradd -m -u 1000 migrate && chown -R migrate:migrate /app
 USER migrate
 CMD ["python", "migrate.py"]
 
-# Stage 4: FastAPI application
+# Stage 4: Documentation builder
+FROM python:3.11-slim AS docs-builder
+WORKDIR /app
+COPY docs/ ./docs/
+COPY mkdocs.yml ./
+RUN pip install --no-cache-dir mkdocs mkdocs-material
+RUN mkdocs build
+
+# Stage 5: FastAPI application
 FROM python:3.11-slim AS api
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 COPY --from=python-builder /root/.local /home/appuser/.local
+COPY --from=docs-builder /app/site/ /app/docs/site/
 COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
-COPY scripts/migrate.py ./scripts/
+COPY scripts/ ./scripts/
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app && chmod +x /home/appuser/.local/bin/*
 USER appuser
 ENV PATH=/home/appuser/.local/bin:$PATH
