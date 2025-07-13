@@ -6,7 +6,8 @@ from unittest.mock import patch
 import os
 import sys
 
-# Skip frontend config tests - these require Node.js environment
+# Frontend config tests require Node.js environment - skipping
+import pytest
 pytest.skip("Frontend config tests require Node.js environment", allow_module_level=True)
 
 

@@ -20,7 +20,7 @@ class TestUserSignOutBug:
                 "current_role": "learner"
             }
             
-            create_response = await client.post("/users/", json=user_data)
+            create_response = await client.post("/api/v1/users", json=user_data)
             assert create_response.status_code == 201, "Failed to create user"
             
             user = create_response.json()
@@ -28,11 +28,11 @@ class TestUserSignOutBug:
             
             # Step 2: Sign in the user
             sign_in_data = {"user_id": user_id}
-            sign_in_response = await client.post("/users/sign-in", json=sign_in_data)
+            sign_in_response = await client.post("/api/v1/users/sign-in", json=sign_in_data)
             assert sign_in_response.status_code == 200, "Failed to sign in"
             
             # Verify user is signed in
-            initial_user_check = await client.get(f"/users/{user_id}")
+            initial_user_check = await client.get(f"/api/v1/users/{user_id}")
             assert initial_user_check.status_code == 200, "User should be accessible after sign in"
             
             # Step 3: Load content catalog (this is where the bug might occur)
@@ -43,7 +43,7 @@ class TestUserSignOutBug:
             
             # Step 4: Verify user is STILL signed in (this is the critical test)
             # The bug is that this step fails - user gets signed out
-            post_content_user_check = await client.get(f"/users/{user_id}")
+            post_content_user_check = await client.get(f"/api/v1/users/{user_id}")
             assert post_content_user_check.status_code == 200, "❌ BUG: User was signed out after loading content catalog!"
             
             # Verify user data is intact
@@ -63,13 +63,13 @@ class TestUserSignOutBug:
                 "current_role": "builder"
             }
             
-            create_response = await client.post("/users/", json=user_data)
+            create_response = await client.post("/api/v1/users", json=user_data)
             assert create_response.status_code == 201
             
             user = create_response.json()
             user_id = user["id"]
             
-            sign_in_response = await client.post("/users/sign-in", json={"user_id": user_id})
+            sign_in_response = await client.post("/api/v1/users/sign-in", json={"user_id": user_id})
             assert sign_in_response.status_code == 200
             
             # Make multiple content requests (simulating user browsing catalog)
@@ -79,7 +79,7 @@ class TestUserSignOutBug:
                 assert content_response.status_code in [200, 404], f"Content request {request_num} failed"
                 
                 # Verify user is still signed in after each request
-                user_check = await client.get(f"/users/{user_id}")
+                user_check = await client.get(f"/api/v1/users/{user_id}")
                 assert user_check.status_code == 200, f"❌ BUG: User signed out after content request {request_num}!"
                 
                 user_data_check = user_check.json()
@@ -100,14 +100,14 @@ class TestUserSignOutBug:
                     "current_role": role
                 }
                 
-                create_response = await client.post("/users/", json=user_data)
+                create_response = await client.post("/api/v1/users", json=user_data)
                 assert create_response.status_code == 201, f"Failed to create {role} user"
                 
                 user = create_response.json()
                 user_id = user["id"]
                 
                 # Sign in user
-                sign_in_response = await client.post("/users/sign-in", json={"user_id": user_id})
+                sign_in_response = await client.post("/api/v1/users/sign-in", json={"user_id": user_id})
                 assert sign_in_response.status_code == 200, f"Failed to sign in {role} user"
                 
                 # Load content catalog
@@ -115,7 +115,7 @@ class TestUserSignOutBug:
                 assert content_response.status_code in [200, 404], f"Content loading failed for {role}"
                 
                 # Critical test: verify user with this role is still signed in
-                user_check = await client.get(f"/users/{user_id}")
+                user_check = await client.get(f"/api/v1/users/{user_id}")
                 assert user_check.status_code == 200, f"❌ BUG: {role} user was signed out after content loading!"
                 
                 user_data_check = user_check.json()
@@ -129,8 +129,8 @@ class TestUserSignOutBug:
             user1_data = {"first_name": "User1", "current_role": "learner"}
             user2_data = {"first_name": "User2", "current_role": "builder"}
             
-            user1_response = await client.post("/users/", json=user1_data)
-            user2_response = await client.post("/users/", json=user2_data)
+            user1_response = await client.post("/api/v1/users", json=user1_data)
+            user2_response = await client.post("/api/v1/users", json=user2_data)
             
             assert user1_response.status_code == 201
             assert user2_response.status_code == 201
@@ -139,16 +139,16 @@ class TestUserSignOutBug:
             user2 = user2_response.json()
             
             # Sign in both users
-            await client.post("/users/sign-in", json={"user_id": user1["id"]})
-            await client.post("/users/sign-in", json={"user_id": user2["id"]})
+            await client.post("/api/v1/users/sign-in", json={"user_id": user1["id"]})
+            await client.post("/api/v1/users/sign-in", json={"user_id": user2["id"]})
             
             # User1 loads content
             content_response = await client.get("/api/v1/content")
             assert content_response.status_code in [200, 404]
             
             # Verify both users are still signed in
-            user1_check = await client.get(f"/users/{user1['id']}")
-            user2_check = await client.get(f"/users/{user2['id']}")
+            user1_check = await client.get(f"/api/v1/users/{user1['id']}")
+            user2_check = await client.get(f"/api/v1/users/{user2['id']}")
             
             assert user1_check.status_code == 200, "❌ BUG: User1 signed out after content loading!"
             assert user2_check.status_code == 200, "❌ BUG: User2 affected by User1's content loading!"

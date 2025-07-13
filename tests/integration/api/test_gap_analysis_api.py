@@ -43,7 +43,7 @@ async def test_analyze_pathway_gaps_success(sample_gap_analysis):
     with patch('src.api.routes.analysis.gap_analysis_service.analyze_pathway_gaps', return_value=sample_gap_analysis):
         async with AsyncClient(app=app, base_url="http://test") as client:
             response = await client.post(
-                "/analysis/pathway-gaps",
+                "/api/v1/analysis/pathway-gaps",
                 json={"pathway_id": 1}
             )
     
@@ -63,7 +63,7 @@ async def test_analyze_pathway_gaps_not_found():
     with patch('src.api.routes.analysis.gap_analysis_service.analyze_pathway_gaps', side_effect=ValueError("Pathway 999 not found")):
         async with AsyncClient(app=app, base_url="http://test") as client:
             response = await client.post(
-                "/analysis/pathway-gaps",
+                "/api/v1/analysis/pathway-gaps",
                 json={"pathway_id": 999}
             )
     
@@ -88,7 +88,7 @@ async def test_analyze_domain_gaps_success(sample_gap_analysis):
     with patch('src.api.routes.analysis.gap_analysis_service.analyze_domain_gaps', return_value=domain_analysis):
         async with AsyncClient(app=app, base_url="http://test") as client:
             response = await client.post(
-                "/analysis/domain-gaps",
+                "/api/v1/analysis/domain-gaps",
                 json={
                     "persona": "developer",
                     "learning_objectives": ["Python", "Web Development"]
@@ -108,7 +108,7 @@ async def test_get_gap_analysis_summary():
     """Test gap analysis summary endpoint."""
     
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/analysis/gap-summary")
+        response = await client.get("/api/v1/analysis/gap-summary")
     
     assert response.status_code == 200
     data = response.json()
@@ -128,7 +128,7 @@ async def test_analyze_pathway_gaps_invalid_request():
     
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.post(
-            "/analysis/pathway-gaps",
+            "/api/v1/analysis/pathway-gaps",
             json={"invalid_field": "value"}
         )
     
@@ -140,7 +140,7 @@ async def test_analyze_domain_gaps_invalid_request():
     
     async with AsyncClient(app=app, base_url="http://test") as client:
         response = await client.post(
-            "/analysis/domain-gaps",
+            "/api/v1/analysis/domain-gaps",
             json={"persona": "developer"}  # Missing learning_objectives
         )
     

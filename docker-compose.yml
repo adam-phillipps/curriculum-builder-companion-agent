@@ -97,17 +97,18 @@ services:
       - CHROMA_SERVER_HOST=0.0.0.0
       - CHROMA_SERVER_HTTP_PORT=8000
     healthcheck:
-      test: [ "CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/8000" ]
+      test: ["CMD", "chroma", "db", "list"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
   # FastAPI Application (clean, production-ready)
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      target: api
+      target: test
     ports:
       - "8001:8000"
     environment:

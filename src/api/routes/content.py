@@ -17,10 +17,10 @@ from src.db.crud.content import (
 )
 from src.config import BuilderConstants
 
-router = APIRouter(prefix="/api/v1", tags=["content"])
+router = APIRouter(prefix="/content", tags=["content"])
 
 # Learning Content Routes
-@router.post("/content", response_model=LearningContentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=LearningContentResponse, status_code=status.HTTP_201_CREATED)
 async def create_learning_content(
     content: LearningContentCreate,
     db: AsyncSession = Depends(get_db)
@@ -31,7 +31,7 @@ async def create_learning_content(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/content/{content_id}", response_model=LearningContentResponse)
+@router.get("/{content_id}", response_model=LearningContentResponse)
 async def get_learning_content(
     content_id: int,
     db: AsyncSession = Depends(get_db)
@@ -42,7 +42,7 @@ async def get_learning_content(
         raise HTTPException(status_code=404, detail="Content not found")
     return content
 
-@router.get("/content", response_model=List[LearningContentResponse])
+@router.get("", response_model=List[LearningContentResponse])
 async def list_learning_content(
     tier: Optional[str] = Query(None, description="Filter by tier"),
     persona: Optional[str] = Query(None, description="Filter by persona"),
@@ -61,7 +61,7 @@ async def list_learning_content(
     }
     return await get_contents(db, filters, skip, limit)
 
-@router.put("/content/{content_id}/status", response_model=LearningContentResponse)
+@router.put("/{content_id}/status", response_model=LearningContentResponse)
 async def update_content_status(
     content_id: int,
     status: str = Query(..., description="New status"),

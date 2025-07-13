@@ -16,8 +16,8 @@ class TestLearnerProfileDynamicData:
             user1_data = {"first_name": "User1", "current_role": "learner"}
             user2_data = {"first_name": "User2", "current_role": "learner"}
             
-            user1_response = await client.post("/users/", json=user1_data)
-            user2_response = await client.post("/users/", json=user2_data)
+            user1_response = await client.post("/api/v1/users", json=user1_data)
+            user2_response = await client.post("/api/v1/users", json=user2_data)
             
             assert user1_response.status_code == 201
             assert user2_response.status_code == 201
@@ -26,8 +26,8 @@ class TestLearnerProfileDynamicData:
             user2 = user2_response.json()
             
             # Get learner profiles for both users
-            profile1_response = await client.get(f"/users/{user1['id']}/learner-profile")
-            profile2_response = await client.get(f"/users/{user2['id']}/learner-profile")
+            profile1_response = await client.get(f"/api/v1/users/{user1['id']}/learner-profile")
+            profile2_response = await client.get(f"/api/v1/users/{user2['id']}/learner-profile")
             
             assert profile1_response.status_code == 200
             assert profile2_response.status_code == 200
@@ -46,14 +46,14 @@ class TestLearnerProfileDynamicData:
         async with AsyncClient(app=app, base_url="http://test") as client:
             # Create a user
             user_data = {"first_name": "TestUser", "current_role": "learner"}
-            user_response = await client.post("/users/", json=user_data)
+            user_response = await client.post("/api/v1/users", json=user_data)
             assert user_response.status_code == 201
             
             user = user_response.json()
             user_id = user["id"]
             
             # Get user's content progress
-            progress_response = await client.get(f"/users/{user_id}/content-progress")
+            progress_response = await client.get(f"/api/v1/users/{user_id}/content-progress")
             assert progress_response.status_code == 200
             
             progress_data = progress_response.json()
@@ -70,15 +70,15 @@ class TestLearnerProfileDynamicData:
             user1_data = {"first_name": "PathUser1", "current_role": "learner"}
             user2_data = {"first_name": "PathUser2", "current_role": "builder"}
             
-            user1_response = await client.post("/users/", json=user1_data)
-            user2_response = await client.post("/users/", json=user2_data)
+            user1_response = await client.post("/api/v1/users", json=user1_data)
+            user2_response = await client.post("/api/v1/users", json=user2_data)
             
             user1 = user1_response.json()
             user2 = user2_response.json()
             
             # Get progress for both users
-            progress1_response = await client.get(f"/users/{user1['id']}/content-progress")
-            progress2_response = await client.get(f"/users/{user2['id']}/content-progress")
+            progress1_response = await client.get(f"/api/v1/users/{user1['id']}/content-progress")
+            progress2_response = await client.get(f"/api/v1/users/{user2['id']}/content-progress")
             
             progress1 = progress1_response.json()
             progress2 = progress2_response.json()

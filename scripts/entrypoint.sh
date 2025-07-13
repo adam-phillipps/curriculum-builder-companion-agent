@@ -140,7 +140,12 @@ start_app() {
 run_tests() {
     log_info "Running test suite..."
     
-    TEST_TYPE=${TEST_TYPE:-"all"}
+    # If arguments provided, use first arg as test type
+    if [ $# -gt 0 ]; then
+        TEST_TYPE="$1"
+    else
+        TEST_TYPE=${TEST_TYPE:-"all"}
+    fi
     
     case $TEST_TYPE in
         "unit")
@@ -185,7 +190,8 @@ case "$1" in
         build_docs
         ;;
     "test")
-        run_tests
+        shift  # Remove "test" from arguments
+        run_tests "$@"
         ;;
     "shell")
         log_info "Starting interactive shell..."

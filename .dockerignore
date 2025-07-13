@@ -59,10 +59,8 @@ docker-compose.yml
 *.log
 logs/
 
-# Test files
-tests/
+# Test files (but keep for test stage)
 test_*
-pytest.ini
 
 # Frontend build artifacts (but keep source)
 frontend/.next/

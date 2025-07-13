@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from src.services.vector_store import vector_store
 
-router = APIRouter(prefix="/api/v1/vector", tags=["vector-store"])
+router = APIRouter(prefix="/vector", tags=["vector-store"])
 
 class SimilaritySearchRequest(BaseModel):
     """Request model for similarity search."""

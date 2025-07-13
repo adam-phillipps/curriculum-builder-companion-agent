@@ -108,7 +108,7 @@ class TestFrontendAPIIntegration:
         async with AsyncClient(app=app, base_url="http://test") as client:
             # Create a user first
             user_data = {"first_name": "Test", "current_role": "learner"}
-            create_response = await client.post("/users/", json=user_data)
+            create_response = await client.post("/api/v1/users", json=user_data)
             assert create_response.status_code == 201
             
             user = create_response.json()
@@ -118,15 +118,15 @@ class TestFrontendAPIIntegration:
             content_response = await client.get("/api/v1/content")
             
             # Now test that user endpoints still work
-            user_response = await client.get(f"/users/{user_id}")
+            user_response = await client.get(f"/api/v1/users/{user_id}")
             assert user_response.status_code == 200, "❌ BUG: Content loading broke user endpoints!"
             
             # Test user list endpoint
-            users_response = await client.get("/users/")
+            users_response = await client.get("/api/v1/users/")
             assert users_response.status_code == 200, "❌ BUG: Content loading broke users list endpoint!"
             
             # Test roles endpoint
-            roles_response = await client.get("/users/roles/available")
+            roles_response = await client.get("/api/v1/users/roles/available")
             assert roles_response.status_code == 200, "❌ BUG: Content loading broke roles endpoint!"
 
 class TestContentAPIDataIntegrity:

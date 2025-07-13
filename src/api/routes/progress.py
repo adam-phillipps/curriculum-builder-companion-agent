@@ -9,7 +9,7 @@ from src.db.models.user import UserContentProgress
 from src.db.models.content import LearningContent
 from sqlalchemy import select
 
-router = APIRouter(prefix="/api/v1/progress", tags=["progress"])
+router = APIRouter(prefix="/progress", tags=["progress"])
 
 class EnrollRequest(BaseModel):
     user_id: int

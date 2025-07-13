@@ -10,7 +10,7 @@ from src.db.crud.learning_outcomes import (
     update_learning_outcome_status, search_similar_outcomes
 )
 
-router = APIRouter(prefix="/api/v1/learning-outcomes", tags=["learning-outcomes"])
+router = APIRouter(prefix="/learning-outcomes", tags=["learning-outcomes"])
 
 class LearningOutcomeCreate(BaseModel):
     name: str

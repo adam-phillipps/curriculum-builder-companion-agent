@@ -12,7 +12,7 @@ class TestRoleAPI:
     async def test_get_available_roles_endpoint(self):
         """Test that available roles endpoint returns correct profile roles."""
         async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get("/users/roles/available")
+            response = await client.get("/api/v1/users/roles/available")
             
             assert response.status_code == 200
             roles = response.json()
@@ -25,7 +25,7 @@ class TestRoleAPI:
     async def test_get_available_career_roles_endpoint(self):
         """Test that career roles endpoint returns job/career roles."""
         async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get("/users/career-roles/available")
+            response = await client.get("/api/v1/users/career-roles/available")
             
             assert response.status_code == 200
             career_roles = response.json()
@@ -45,7 +45,7 @@ class TestRoleAPI:
                 "career_role": "developer"
             }
             
-            response = await client.post("/users/", json=user_data)
+            response = await client.post("/api/v1/users", json=user_data)
             
             assert response.status_code == 201
             user = response.json()
@@ -62,7 +62,7 @@ class TestRoleAPI:
                 "current_role": "invalid_role"
             }
             
-            response = await client.post("/users/", json=user_data)
+            response = await client.post("/api/v1/users", json=user_data)
             
             assert response.status_code == 400
             error = response.json()
@@ -80,14 +80,14 @@ class TestRoleAPI:
                 "career_role": "ml_engineer"
             }
             
-            create_response = await client.post("/users/", json=user_data)
+            create_response = await client.post("/api/v1/users", json=user_data)
             assert create_response.status_code == 201
             
             user = create_response.json()
             user_id = user["id"]
             
             # Get user and verify role separation
-            get_response = await client.get(f"/users/{user_id}")
+            get_response = await client.get(f"/api/v1/users/{user_id}")
             assert get_response.status_code == 200
             
             retrieved_user = get_response.json()

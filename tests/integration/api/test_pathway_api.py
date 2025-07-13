@@ -14,7 +14,7 @@ class TestPathwayAPI:
     async def test_chain_analysis_endpoint_success(self):
         """Test chain analysis endpoint with valid pathway."""
         async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get("/pathway/2/chain-analysis")
+            response = await client.get("/api/v1/pathway/2/chain-analysis")
             
             if response.status_code == 200:
                 data = response.json()
@@ -36,14 +36,14 @@ class TestPathwayAPI:
     async def test_nonexistent_pathway(self):
         """Test chain analysis with nonexistent pathway."""
         async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get("/pathway/99999/chain-analysis")
+            response = await client.get("/api/v1/pathway/99999/chain-analysis")
             assert response.status_code == 404
     
     @pytest.mark.asyncio
     async def test_skill_profile_endpoint(self):
         """Test user skill profile endpoint."""
         async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get("/pathway/1/skill-profile")
+            response = await client.get("/api/v1/pathway/1/skill-profile")
             
             assert response.status_code == 200
             data = response.json()

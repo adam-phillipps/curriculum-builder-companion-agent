@@ -41,8 +41,7 @@ class VectorStoreService:
                         host=settings.CHROMA_HOST,
                         port=settings.CHROMA_PORT
                     )
-                # Test connection
-                self._client.heartbeat()
+                # Connection will be tested when first used
             except Exception as e:
                 print(f"ChromaDB connection failed: {e}")
                 # For development, we can continue without vector store

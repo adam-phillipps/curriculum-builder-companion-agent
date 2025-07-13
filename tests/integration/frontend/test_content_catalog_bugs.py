@@ -66,7 +66,7 @@ class TestUserSessionPersistence:
                 "current_role": "learner"
             }
             
-            create_response = await client.post("/users/", json=user_data)
+            create_response = await client.post("/api/v1/users", json=user_data)
             assert create_response.status_code == 201, "Failed to create test user"
             
             user = create_response.json()
@@ -74,7 +74,7 @@ class TestUserSessionPersistence:
             
             # Sign in the user
             sign_in_data = {"user_id": user_id}
-            sign_in_response = await client.post("/users/sign-in", json=sign_in_data)
+            sign_in_response = await client.post("/api/v1/users/sign-in", json=sign_in_data)
             assert sign_in_response.status_code == 200, "Failed to sign in user"
             
             sign_in_result = sign_in_response.json()
@@ -88,7 +88,7 @@ class TestUserSessionPersistence:
             assert content_response.status_code in [200, 404], "Content loading failed"
             
             # Verify user is still signed in by checking their profile
-            profile_response = await client.get(f"/users/{user_id}")
+            profile_response = await client.get(f"/api/v1/users/{user_id}")
             assert profile_response.status_code == 200, "User was signed out after loading content catalog"
             
             profile_data = profile_response.json()
@@ -106,13 +106,13 @@ class TestUserSessionPersistence:
                 "current_role": "builder"
             }
             
-            create_response = await client.post("/users/", json=user_data)
+            create_response = await client.post("/api/v1/users", json=user_data)
             assert create_response.status_code == 201
             
             user = create_response.json()
             user_id = user["id"]
             
-            sign_in_response = await client.post("/users/sign-in", json={"user_id": user_id})
+            sign_in_response = await client.post("/api/v1/users/sign-in", json={"user_id": user_id})
             assert sign_in_response.status_code == 200
             
             # Make multiple content requests (simulating catalog reloads)
@@ -121,7 +121,7 @@ class TestUserSessionPersistence:
                 assert content_response.status_code in [200, 404], f"Content request {i+1} failed"
                 
                 # Verify user is still signed in after each request
-                user_check = await client.get(f"/users/{user_id}")
+                user_check = await client.get(f"/api/v1/users/{user_id}")
                 assert user_check.status_code == 200, f"User signed out after content request {i+1}"
                 
                 user_data_check = user_check.json()
@@ -144,14 +144,14 @@ class TestContentCatalogIntegration:
                     "current_role": role
                 }
                 
-                create_response = await client.post("/users/", json=user_data)
+                create_response = await client.post("/api/v1/users", json=user_data)
                 assert create_response.status_code == 201, f"Failed to create {role} user"
                 
                 user = create_response.json()
                 user_id = user["id"]
                 
                 # Sign in user
-                sign_in_response = await client.post("/users/sign-in", json={"user_id": user_id})
+                sign_in_response = await client.post("/api/v1/users/sign-in", json={"user_id": user_id})
                 assert sign_in_response.status_code == 200, f"Failed to sign in {role} user"
                 
                 # Load content catalog
@@ -159,7 +159,7 @@ class TestContentCatalogIntegration:
                 assert content_response.status_code in [200, 404], f"Content loading failed for {role}"
                 
                 # Verify user is still signed in
-                user_check = await client.get(f"/users/{user_id}")
+                user_check = await client.get(f"/api/v1/users/{user_id}")
                 assert user_check.status_code == 200, f"{role} user was signed out"
                 
                 user_data_check = user_check.json()

@@ -31,7 +31,7 @@ async def test_create_user_endpoint(db_session: AsyncSession):
                 "current_role": "learner"
             }
             
-            response = await client.post("/users/", json=user_data)
+            response = await client.post("/api/v1/users", json=user_data)
             
             assert response.status_code == 201
             data = response.json()
@@ -53,7 +53,7 @@ async def test_create_user_invalid_role():
             "current_role": "invalid_role"
         }
         
-        response = await client.post("/users/", json=user_data)
+        response = await client.post("/api/v1/users", json=user_data)
         
         assert response.status_code == 400
         assert "Invalid profile role" in response.json()["detail"]
@@ -62,7 +62,7 @@ async def test_create_user_invalid_role():
 async def test_get_users_endpoint():
     """Test getting list of users via API."""
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/users/")
+        response = await client.get("/api/v1/users/")
         
         assert response.status_code == 200
         data = response.json()
@@ -87,7 +87,7 @@ async def test_get_user_by_id_endpoint(db_session: AsyncSession):
         user = await create_user(db_session, user_data)
         
         async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get(f"/users/{user.id}")
+            response = await client.get(f"/api/v1/users/{user.id}")
             
             assert response.status_code == 200
             data = response.json()
@@ -100,7 +100,7 @@ async def test_get_user_by_id_endpoint(db_session: AsyncSession):
 async def test_get_user_not_found():
     """Test getting a non-existent user."""
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/users/99999")
+        response = await client.get("/api/v1/users/99999")
         
         assert response.status_code == 404
         assert "User not found" in response.json()["detail"]
@@ -128,7 +128,7 @@ async def test_update_user_endpoint(db_session: AsyncSession):
                 "current_role": "builder"
             }
             
-            response = await client.put(f"/users/{user.id}", json=update_data)
+            response = await client.put(f"/api/v1/users/{user.id}", json=update_data)
             
             assert response.status_code == 200
             data = response.json()
@@ -157,7 +157,7 @@ async def test_sign_in_user_endpoint(db_session: AsyncSession):
         async with AsyncClient(app=app, base_url="http://test") as client:
             sign_in_data = {"user_id": user.id}
             
-            response = await client.post("/users/sign-in", json=sign_in_data)
+            response = await client.post("/api/v1/users/sign-in", json=sign_in_data)
             
             assert response.status_code == 200
             data = response.json()
@@ -173,7 +173,7 @@ async def test_sign_in_user_not_found():
     async with AsyncClient(app=app, base_url="http://test") as client:
         sign_in_data = {"user_id": 99999}
         
-        response = await client.post("/users/sign-in", json=sign_in_data)
+        response = await client.post("/api/v1/users/sign-in", json=sign_in_data)
         
         assert response.status_code == 404
         assert "User not found" in response.json()["detail"]
@@ -182,7 +182,7 @@ async def test_sign_in_user_not_found():
 async def test_get_available_roles():
     """Test getting available user roles."""
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get("/users/roles/available")
+        response = await client.get("/api/v1/users/roles/available")
         
         assert response.status_code == 200
         roles = response.json()
@@ -211,7 +211,7 @@ async def test_get_learner_profile_endpoint(db_session: AsyncSession):
         user = await create_user(db_session, user_data)
         
         async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get(f"/users/{user.id}/learner-profile")
+            response = await client.get(f"/api/v1/users/{user.id}/learner-profile")
             
             assert response.status_code == 200
             data = response.json()
@@ -231,7 +231,7 @@ async def test_get_user_content_progress_endpoint(db_session: AsyncSession):
     user = await create_user(db_session, user_data)
     
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.get(f"/users/{user.id}/content-progress")
+        response = await client.get(f"/api/v1/users/{user.id}/content-progress")
         
         assert response.status_code == 200
         data = response.json()
@@ -252,14 +252,14 @@ async def test_search_users_endpoint(db_session: AsyncSession):
         
         async with AsyncClient(app=app, base_url="http://test") as client:
             # Test search by name
-            response = await client.get("/users/search?q=Alice")
+            response = await client.get("/api/v1/users/search?q=Alice")
             assert response.status_code == 200
             data = response.json()
             assert len(data) >= 1
             assert any(user["first_name"] == "Alice" for user in data)
             
             # Test search by role
-            response = await client.get("/users/search?role=builder")
+            response = await client.get("/api/v1/users/search?role=builder")
             assert response.status_code == 200
             data = response.json()
             assert len(data) >= 1
@@ -289,14 +289,14 @@ async def test_sign_in_by_identifier_endpoint(db_session: AsyncSession):
         
         async with AsyncClient(app=app, base_url="http://test") as client:
             # Test sign-in by email
-            response = await client.post("/users/sign-in/by-identifier", 
+            response = await client.post("/api/v1/users/sign-in/by-identifier", 
                                        json={"identifier": unique_email})
             assert response.status_code == 200
             data = response.json()
             assert data["user"]["id"] == user.id
             
             # Test sign-in by name
-            response = await client.post("/users/sign-in/by-identifier", 
+            response = await client.post("/api/v1/users/sign-in/by-identifier", 
                                        json={"identifier": "SignIn Test"})
             assert response.status_code == 200
             data = response.json()
@@ -308,7 +308,7 @@ async def test_sign_in_by_identifier_endpoint(db_session: AsyncSession):
 async def test_sign_in_by_identifier_not_found():
     """Test sign-in by identifier with non-existent user."""
     async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.post("/users/sign-in/by-identifier", 
+        response = await client.post("/api/v1/users/sign-in/by-identifier", 
                                    json={"identifier": "NonExistentUser"})
         assert response.status_code == 404
         assert "User not found" in response.json()["detail"]

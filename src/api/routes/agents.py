@@ -7,7 +7,7 @@ from src.api.dependencies import get_db
 from src.agents.workflow import ContentProcessingWorkflow
 from src.agents.state import WorkflowState, WorkflowStatus
 
-router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
+router = APIRouter(prefix="/agents", tags=["agents"])
 
 class ContentSubmissionRequest(BaseModel):
     model_config = {"protected_namespaces": ()}
