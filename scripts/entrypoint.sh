@@ -197,6 +197,11 @@ case "$1" in
         log_info "Starting interactive shell..."
         exec /bin/bash
         ;;
+    "exec")
+        log_info "Executing command: ${*:2}"
+        shift  # Remove "exec" from arguments
+        exec "$@"
+        ;;
     "help"|"--help"|"-h")
         echo "Usage: $0 [COMMAND]"
         echo ""
@@ -208,6 +213,7 @@ case "$1" in
         echo "  docs         Build documentation only"
         echo "  test         Run test suite"
         echo "  shell        Start interactive bash shell"
+        echo "  exec         Execute arbitrary command (e.g., exec python script.py)"
         echo "  help         Show this help message"
         echo ""
         echo "Environment Variables:"

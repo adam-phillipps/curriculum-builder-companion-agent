@@ -150,6 +150,7 @@ module "ecs_services" {
   ecs_security_group_id  = module.networking.ecs_security_group_id
   target_group_arn       = module.ecs.api_target_group_arn
   alb_listener_arn       = ""
+  vpc_id                 = module.networking.vpc_id
   tags                   = local.environment_tags
 }
 

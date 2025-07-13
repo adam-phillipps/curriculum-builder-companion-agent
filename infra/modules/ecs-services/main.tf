@@ -121,7 +121,7 @@ resource "aws_ecs_task_definition" "api" {
         },
         {
           name  = "CHROMA_HOST"
-          value = "localhost"
+          value = "${var.environment}-curriculum-chromadb.${var.environment}-curriculum-cluster.local"
         },
         {
           name  = "CHROMA_PORT"
@@ -237,11 +237,11 @@ resource "aws_ecs_task_definition" "chromadb" {
       }
       
       healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:8000/api/v1/heartbeat || exit 1"]
+        command     = ["CMD", "chroma", "db", "list"]
         interval    = 30
-        timeout     = 5
+        timeout     = 10
         retries     = 3
-        startPeriod = 30
+        startPeriod = 40
       }
     }
   ])
@@ -406,6 +406,34 @@ resource "aws_ecs_service" "api" {
   tags       = var.tags
 }
 
+# Service Discovery Namespace
+resource "aws_service_discovery_private_dns_namespace" "main" {
+  name = "${var.environment}-curriculum-cluster.local"
+  vpc  = var.vpc_id
+  
+  tags = var.tags
+}
+
+# Service Discovery Service for ChromaDB
+resource "aws_service_discovery_service" "chromadb" {
+  name = "${var.environment}-curriculum-chromadb"
+  
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.main.id
+    
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+    
+    routing_policy = "MULTIVALUE"
+  }
+  
+  health_check_grace_period_seconds = 30
+  
+  tags = var.tags
+}
+
 # ChromaDB Service
 resource "aws_ecs_service" "chromadb" {
   name            = "${var.environment}-curriculum-chromadb"
@@ -418,6 +446,10 @@ resource "aws_ecs_service" "chromadb" {
     subnets          = var.private_subnet_ids
     security_groups  = [var.ecs_security_group_id]
     assign_public_ip = false
+  }
+  
+  service_registries {
+    registry_arn = aws_service_discovery_service.chromadb.arn
   }
 
   tags = var.tags

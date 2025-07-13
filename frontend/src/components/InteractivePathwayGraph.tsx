@@ -63,63 +63,50 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
     try {
       console.log('Loading pathway data for user:', userId, 'pathway:', pathwayId);
       
-      // Use direct fetch to avoid API client issues
-      const response = await fetch(buildApiUrl(`users/${userId}/content-progress`));
+      // Use pathway generation API
+      const pathwayUrl = `pathway/user-pathway/${userId}?root_content_id=${pathwayId}`;
+      
+      const response = await fetch(buildApiUrl(pathwayUrl));
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      const userProgress = await response.json();
+      const pathwayData = await response.json();
       
-      console.log('User progress data:', userProgress);
-      console.log('Progress length:', userProgress?.length);
+      console.log('Generated pathway data:', pathwayData);
       
-      if (!userProgress || userProgress.length === 0) {
-        console.log('No progress data found');
+      if (!pathwayData.nodes || pathwayData.nodes.length === 0) {
+        console.log('No pathway nodes found');
         setNodes([]);
         setChainImpacts({});
         return;
       }
       
-      // Get content details to extract learning outcomes
-      const contentResponse = await fetch(buildApiUrl('content'));
-      const allContent = await contentResponse.json();
-      
-      // Define tree structure with proper prerequisites
-      const treeStructure = {
-        1: { prereqs: [], outcomes: ['Mathematics Fundamentals'] },
-        2: { prereqs: [1], outcomes: ['Mathematics Fundamentals'] },
-        3: { prereqs: [], outcomes: ['Programming Fundamentals'] },
-        4: { prereqs: [3], outcomes: ['Programming Fundamentals'] },
-        5: { prereqs: [2, 4], outcomes: ['ML Theory'] },
-        6: { prereqs: [5], outcomes: ['Neural Networks Mastery'] }
-      };
-      
-      // Convert user progress to pathway nodes with enhanced metadata
-      const mockNodes = userProgress.map((progress: any) => {
-        const contentItem = allContent.find((c: any) => c.id === progress.content_id);
-        const treeInfo = treeStructure[progress.content_id as keyof typeof treeStructure];
-        const outcomes = treeInfo?.outcomes || contentItem?.learning_objectives || [`Objective ${progress.content_id}`];
+      // Convert pathway nodes to graph format
+      const graphNodes = pathwayData.nodes.map((node: any) => {
         
         return {
-          id: `node_${progress.content_id}`,
-          content_id: progress.content_id,
-          weight: 0.5,
-          completion: progress.progress_percentage,
-          status: progress.status,
-          name: contentItem?.title || `Learning Item ${progress.content_id}`,
-          description: `Progress: ${progress.progress_percentage}% - ${progress.time_spent_minutes} minutes`,
-          learning_outcomes: outcomes,
-          prerequisites: treeInfo?.prereqs || [],
-          domain: contentItem?.tier || 'general',
-          difficulty_level: contentItem?.tier || 'intermediate',
-          comprehension_percentage: progress.comprehension_percentage || 0
+          id: node.id,
+          content_id: node.content_id,
+          weight: node.weight,
+          completion: node.progress_percentage,
+          status: node.status,
+          name: node.title,
+          description: node.description,
+          learning_outcomes: node.learning_outcomes,
+          prerequisites: node.prerequisites,
+          domain: node.tier,
+          difficulty_level: node.tier,
+          comprehension_percentage: node.comprehension_percentage
         };
       });
+      
+      // Store pathway edges for link generation
+      const pathwayEdges = pathwayData.edges || [];
       
       // Extract domains and difficulties for filters
       const domains = new Set<string>();
       const difficulties = new Set<string>();
-      mockNodes.forEach(node => {
+      graphNodes.forEach(node => {
         if (node.domain) domains.add(node.domain);
         if (node.difficulty_level) difficulties.add(node.difficulty_level);
       });
@@ -128,23 +115,27 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
       
       // Extract all unique learning outcomes for filter
       const allOutcomes = new Set<string>();
-      mockNodes.forEach(node => {
+      graphNodes.forEach(node => {
         node.learning_outcomes.forEach((outcome: string) => allOutcomes.add(outcome));
       });
       setAvailableOutcomes(Array.from(allOutcomes));
       
-      console.log('Generated nodes:', mockNodes);
+      console.log('Generated nodes:', graphNodes);
+      console.log('Generated edges:', pathwayEdges);
       
-      setNodes(mockNodes);
+      setNodes(graphNodes);
       
-      // Generate chain impacts based on actual completion
+      // Generate chain impacts based on pathway weights and completion
       const impacts: ChainImpact = {};
-      mockNodes.forEach(node => {
+      graphNodes.forEach(node => {
         impacts[node.id] = (node.completion / 100) * node.weight;
       });
       
       console.log('Generated impacts:', impacts);
       setChainImpacts(impacts);
+      
+      // Store edges for link generation
+      (window as any).pathwayEdges = pathwayEdges;
       
     } catch (error) {
       console.error('Failed to load pathway data:', error);
@@ -255,20 +246,20 @@ export default function InteractivePathwayGraph({ userId, pathwayId }: Interacti
       return;
     }
 
-    // Create prerequisite-based directed links (prerequisite -> dependent)
+    // Create links from pathway edges
+    const pathwayEdges = (window as any).pathwayEdges || [];
     const links = [];
-    filteredNodes.forEach(node => {
-      // Create links from prerequisites to this node
-      if (node.prerequisites && node.prerequisites.length > 0) {
-        node.prerequisites.forEach((prereqId: number) => {
-          const prereqNode = filteredNodes.find(n => n.content_id === prereqId);
-          if (prereqNode) {
-            links.push({
-              source: prereqNode.id,
-              target: node.id,
-              weight: 0.8
-            });
-          }
+    
+    pathwayEdges.forEach((edge: any) => {
+      const sourceNode = filteredNodes.find(n => n.id === edge.source_id);
+      const targetNode = filteredNodes.find(n => n.id === edge.target_id);
+      
+      if (sourceNode && targetNode) {
+        links.push({
+          source: edge.source_id,
+          target: edge.target_id,
+          weight: edge.strength,
+          relationship_type: edge.relationship_type
         });
       }
     });

@@ -48,6 +48,7 @@ class LearnerProfileResponse(BaseModel):
     learning_goals: Optional[List[Dict[str, Any]]]
     target_outcomes: Optional[List[Dict[str, Any]]]
     current_pathway_id: Optional[int]
+    primary_learning_outcome_id: Optional[int]  # User's primary learning goal
     skill_assessment: Optional[Dict[str, Any]]
     skill_levels: Optional[Dict[str, Any]]
     total_content_completed: int
@@ -70,6 +71,7 @@ class UserContentProgressResponse(BaseModel):
     content_id: int
     status: str
     progress_percentage: int
+    comprehension_percentage: Optional[float] = Field(None, ge=0, le=100)
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     last_accessed_at: datetime

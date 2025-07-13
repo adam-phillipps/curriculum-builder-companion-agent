@@ -43,7 +43,7 @@ class TestPathwayAPI:
     async def test_skill_profile_endpoint(self):
         """Test user skill profile endpoint."""
         async with AsyncClient(app=app, base_url="http://test") as client:
-            response = await client.get("/api/v1/pathway/1/skill-profile")
+            response = await client.get("/api/v1/pathway/skill-profile/1")
             
             assert response.status_code == 200
             data = response.json()

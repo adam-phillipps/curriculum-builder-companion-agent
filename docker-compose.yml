@@ -136,9 +136,9 @@ services:
         condition: service_healthy
       chromadb:
         condition: service_healthy
-    # Remove volume mount to preserve built docs in container
-    # volumes:
-    #   - .:/app
+    # Volume mount for faster development iteration
+    volumes:
+      - .:/app
     entrypoint: ["./scripts/entrypoint.sh"]
     command: ["app-minimal"]  # Clean app start, no setup tasks
 

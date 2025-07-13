@@ -2,7 +2,254 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { buildApiUrl } from '../config/api';
 import InteractivePathwayGraph from './InteractivePathwayGraph';
+
+// Learning Goal Section Component
+function LearningGoalSection({ userId, profile, onGoalSet }: { userId: number, profile: any, onGoalSet: () => void }) {
+  const [showGoalSetter, setShowGoalSetter] = useState(false);
+  const [learningGoal, setLearningGoal] = useState('');
+  const [goalSuggestions, setGoalSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState<any>(null);
+  const [searchingGoals, setSearchingGoals] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Debounced search for learning goals
+  useEffect(() => {
+    if (!learningGoal.trim() || learningGoal.length < 3) {
+      setGoalSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    
+    const timeoutId = setTimeout(async () => {
+      await searchLearningGoals(learningGoal);
+    }, 800);
+    
+    return () => clearTimeout(timeoutId);
+  }, [learningGoal]);
+  
+  const searchLearningGoals = async (query: string) => {
+    setSearchingGoals(true);
+    try {
+      const response = await fetch(
+        buildApiUrl(`learning-outcomes/search?query=${encodeURIComponent(query)}&max_results=5`)
+      );
+      
+      if (response.ok) {
+        const suggestions = await response.json();
+        setGoalSuggestions(suggestions);
+        setShowSuggestions(true);
+      } else {
+        setGoalSuggestions([{
+          outcome_id: null,
+          name: query,
+          description: `Custom learning goal: ${query}`,
+          domain: "custom",
+          difficulty_level: "intermediate",
+          tags: [],
+          similarity_score: 0.0,
+          is_existing: false
+        }]);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      setGoalSuggestions([{
+        outcome_id: null,
+        name: query,
+        description: `Custom learning goal: ${query}`,
+        domain: "custom",
+        difficulty_level: "intermediate",
+        tags: [],
+        similarity_score: 0.0,
+        is_existing: false
+      }]);
+      setShowSuggestions(true);
+    } finally {
+      setSearchingGoals(false);
+    }
+  };
+  
+  const handleGoalSelect = (suggestion: any) => {
+    setSelectedGoal(suggestion);
+    setLearningGoal(suggestion.name);
+    setShowSuggestions(false);
+  };
+
+  const handleSaveGoal = async () => {
+    if (!selectedGoal) return;
+    
+    setSaving(true);
+    try {
+      let goalId = selectedGoal.outcome_id;
+      
+      // If it's a custom goal, create it first
+      if (!selectedGoal.is_existing) {
+        const goalResponse = await fetch(buildApiUrl('learning-outcomes/'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: selectedGoal.name,
+            description: selectedGoal.description,
+            domain: selectedGoal.domain,
+            difficulty_level: selectedGoal.difficulty_level,
+            tags: selectedGoal.tags,
+            created_by_user_id: userId
+          })
+        });
+        
+        if (goalResponse.ok) {
+          const newGoal = await goalResponse.json();
+          goalId = newGoal.id;
+        }
+      }
+      
+      // Set as primary goal
+      if (goalId) {
+        await fetch(buildApiUrl(`users/${userId}/primary-goal`), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ learning_outcome_id: goalId })
+        });
+        
+        // Reset form and refresh profile
+        setShowGoalSetter(false);
+        setLearningGoal('');
+        setSelectedGoal(null);
+        onGoalSet();
+      }
+    } catch (error) {
+      console.error('Failed to set learning goal:', error);
+      alert('Failed to set learning goal. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!profile.current_pathway_id && !showGoalSetter) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="text-yellow-600 mr-3">⚠️</div>
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">Set Your Learning Goal</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                To see your complete learning pathway, set a specific learning outcome goal.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowGoalSetter(true)}
+            className="bg-yellow-600 text-white px-4 py-2 rounded text-sm hover:bg-yellow-700"
+          >
+            Set Goal
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showGoalSetter) {
+    return (
+      <div className="bg-white border rounded-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4">Set Your Learning Goal</h3>
+        
+        <div className="relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Learning Goal
+          </label>
+          <input
+            type="text"
+            value={learningGoal}
+            onChange={(e) => setLearningGoal(e.target.value)}
+            placeholder="e.g., 'Python programming', 'AWS architecture', 'Machine learning'..."
+            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            We'll suggest similar goals or you can create your own
+          </p>
+          
+          {/* Goal Suggestions Dropdown */}
+          {showSuggestions && goalSuggestions.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {goalSuggestions
+                .sort((a, b) => {
+                  if (a.is_existing && !b.is_existing) return -1;
+                  if (!a.is_existing && b.is_existing) return 1;
+                  if (a.is_existing && b.is_existing) return b.similarity_score - a.similarity_score;
+                  return 0;
+                })
+                .map((suggestion, index) => (
+                <div
+                  key={`${suggestion.outcome_id || 'custom'}-${index}`}
+                  onClick={() => handleGoalSelect(suggestion)}
+                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{suggestion.name}</div>
+                      <div className="text-xs text-gray-600 truncate">{suggestion.description}</div>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                          {suggestion.domain.replace('_', ' ')}
+                        </span>
+                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                          {suggestion.difficulty_level}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="ml-2 text-right">
+                      {suggestion.is_existing ? (
+                        <div className="text-xs text-green-600">
+                          {Math.round(suggestion.similarity_score * 100)}% match
+                        </div>
+                      ) : (
+                        <div className="text-xs text-blue-600">Create new</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {searchingGoals && (
+            <div className="text-xs text-blue-600 mt-1">🔄 Searching for similar goals...</div>
+          )}
+          
+          {selectedGoal && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm">
+              <div className="font-medium text-green-800">Selected: {selectedGoal.name}</div>
+              <div className="text-green-600 text-xs">
+                {selectedGoal.is_existing ? 'Existing goal' : 'Will create new goal'}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex space-x-3 mt-4">
+          <button
+            onClick={() => setShowGoalSetter(false)}
+            className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveGoal}
+            disabled={!selectedGoal || saving}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save Goal'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
 
 interface LearnerProfile {
   id: number;
@@ -142,13 +389,14 @@ export default function LearnerProfile({ userId }: LearnerProfileProps) {
         </div>
       )}
 
+      {/* Learning Goal Setting */}
+      <LearningGoalSection userId={userId} profile={profile} onGoalSet={loadProfileData} />
+
       {/* Interactive Pathway Graph with Chain Rule */}
-      {profile.current_pathway_id && (
-        <InteractivePathwayGraph 
-          userId={userId} 
-          pathwayId={profile.current_pathway_id}
-        />
-      )}
+      <InteractivePathwayGraph 
+        userId={userId} 
+        pathwayId={profile.current_pathway_id || 0}
+      />
     </div>
   );
 }

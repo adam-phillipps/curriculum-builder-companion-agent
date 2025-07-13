@@ -147,3 +147,8 @@ variable "alb_listener_arn" {
   description = "ALB listener ARN"
   type        = string
 }
+
+variable "vpc_id" {
+  description = "VPC ID for service discovery"
+  type        = string
+}
