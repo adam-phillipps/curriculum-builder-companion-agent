@@ -20,8 +20,12 @@ resource "aws_ecs_task_definition" "api" {
           value = var.environment
         },
         {
+          name  = "APP_ENV"
+          value = var.environment == "production" ? "production" : "development"
+        },
+        {
           name  = "REDIS_HOST"
-          value = "localhost"
+          value = var.redis_endpoint
         },
         {
           name  = "REDIS_PORT"
@@ -29,7 +33,7 @@ resource "aws_ecs_task_definition" "api" {
         },
         {
           name  = "CHROMA_HOST"
-          value = "localhost"
+          value = "${var.environment}-curriculum-chromadb.${var.environment}-curriculum-cluster.local"
         },
         {
           name  = "CHROMA_PORT"
@@ -270,8 +274,12 @@ resource "aws_ecs_task_definition" "db_migrate" {
           value = var.environment
         },
         {
+          name  = "APP_ENV"
+          value = var.environment == "production" ? "production" : "development"
+        },
+        {
           name  = "REDIS_HOST"
-          value = "localhost"
+          value = var.redis_endpoint
         },
         {
           name  = "REDIS_PORT"
@@ -279,7 +287,7 @@ resource "aws_ecs_task_definition" "db_migrate" {
         },
         {
           name  = "CHROMA_HOST"
-          value = "localhost"
+          value = "${var.environment}-curriculum-chromadb.${var.environment}-curriculum-cluster.local"
         },
         {
           name  = "CHROMA_PORT"
