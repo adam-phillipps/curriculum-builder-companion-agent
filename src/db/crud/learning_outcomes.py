@@ -34,7 +34,7 @@ async def create_learning_outcome(
     await db.commit()
     await db.refresh(outcome)
     
-    # Add to vector store
+    # Add to vector store (non-blocking)
     try:
         vector_store.add_learning_outcome(
             outcome_id=outcome.id,
@@ -46,6 +46,7 @@ async def create_learning_outcome(
         )
     except Exception as e:
         print(f"Failed to add outcome to vector store: {e}")
+        # Continue without vector store - not critical for creation
     
     return outcome
 

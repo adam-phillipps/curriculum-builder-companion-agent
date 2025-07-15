@@ -101,6 +101,22 @@ verify_aws() {
 # Infrastructure commands
 cmd_deploy() {
     local env=${1:-sandbox}
+    local auto_approve=false
+    
+    # Parse arguments for --auto-approve flag
+    shift
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --auto-approve)
+                auto_approve=true
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+    
     log_info "Deploying infrastructure to $env environment"
     
     cd "$PROJECT_ROOT/infra/environments/$env"
@@ -113,8 +129,12 @@ cmd_deploy() {
     terraform init -reconfigure
     terraform plan -out=tfplan
     
-    echo "Review the plan above. Press Enter to continue or Ctrl+C to cancel..."
-    read -r
+    if [ "$auto_approve" = true ]; then
+        log_info "Auto-approving deployment..."
+    else
+        echo "Review the plan above. Press Enter to continue or Ctrl+C to cancel..."
+        read -r
+    fi
     
     terraform apply tfplan
     log_success "Infrastructure deployed successfully"
@@ -994,7 +1014,7 @@ ngage CLI - Unified command interface
 Usage: $0 <command> [environment] [options]
 
 Commands:
-  deploy [env]                 Deploy infrastructure (AWS only)
+  deploy [env] [--auto-approve] Deploy infrastructure (AWS only)
   secrets [env] [options]      Update API secrets (AWS only)
     --openai-key KEY           OpenAI API key
     --anthropic-key KEY        Anthropic API key  
@@ -1040,7 +1060,7 @@ EOF
 
 # Main command dispatcher
 case "${1:-help}" in
-    deploy) cmd_deploy "${2:-sandbox}" ;;
+    deploy) cmd_deploy "${2:-sandbox}" "${@:3}" ;;
     secrets) cmd_secrets "${2:-sandbox}" "${@:3}" ;;
     build) cmd_build "${2:-sandbox}" "${3:-curriculum-api}" "${4:-patch}" ;;
     migrate) cmd_migrate "${2:-local}" ;;

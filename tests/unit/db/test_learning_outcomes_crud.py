@@ -240,3 +240,65 @@ class TestSearchSimilarOutcomes:
         
         # Assert
         assert result == []
+
+
+class TestLearningOutcomeBugFixes:
+    """Test fixes for learning outcome bugs discovered in production."""
+    
+    @pytest.mark.asyncio
+    @patch('src.db.crud.learning_outcomes.vector_store')
+    async def test_create_outcome_handles_vector_store_permission_error(self, mock_vector_store, mock_db, sample_outcome_data):
+        """Test that outcome creation continues when vector store has permission errors."""
+        # Setup - simulate cache permission error
+        mock_db.add = MagicMock()
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+        mock_db.refresh.side_effect = lambda obj: setattr(obj, 'id', 1)
+        mock_vector_store.add_learning_outcome.side_effect = PermissionError("Permission denied: '/home/appuser/.cache'")
+        
+        # Execute - should not raise exception
+        result = await create_learning_outcome(
+            db=mock_db,
+            **sample_outcome_data
+        )
+        
+        # Assert - outcome still created despite vector store cache error
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+        assert result.name == sample_outcome_data["name"]
+    
+    @pytest.mark.asyncio
+    @patch('src.db.crud.learning_outcomes.vector_store')
+    async def test_create_outcome_handles_chromadb_connection_error(self, mock_vector_store, mock_db, sample_outcome_data):
+        """Test that outcome creation continues when ChromaDB is unreachable."""
+        # Setup - simulate ChromaDB connection error
+        mock_db.add = MagicMock()
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+        mock_db.refresh.side_effect = lambda obj: setattr(obj, 'id', 1)
+        mock_vector_store.add_learning_outcome.side_effect = ConnectionError("Could not connect to ChromaDB")
+        
+        # Execute - should not raise exception
+        result = await create_learning_outcome(
+            db=mock_db,
+            **sample_outcome_data
+        )
+        
+        # Assert - outcome still created despite ChromaDB connection error
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+        assert result.name == sample_outcome_data["name"]
+    
+    @pytest.mark.asyncio
+    @patch('src.db.crud.learning_outcomes.vector_store')
+    async def test_search_similar_outcomes_handles_cache_permission_error(self, mock_vector_store):
+        """Test that similarity search handles cache permission errors gracefully."""
+        # Setup - simulate cache permission error
+        mock_vector_store.find_similar_outcomes.side_effect = PermissionError("[Errno 13] Permission denied: '/home/appuser/.cache'")
+        
+        # Execute - should not raise exception
+        result = await search_similar_outcomes("python programming")
+        
+        # Assert - returns empty list instead of crashing
+        assert result == []
+        mock_vector_store.find_similar_outcomes.assert_called_once()

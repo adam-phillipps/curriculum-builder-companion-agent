@@ -35,6 +35,9 @@ resource "aws_api_gateway_integration" "proxy" {
   
   # Prevent redirects by ensuring proper path handling
   passthrough_behavior = "WHEN_NO_MATCH"
+  
+  # Increase timeout for slow operations
+  timeout_milliseconds = 29000
 }
 
 # Method for proxy resource
@@ -46,6 +49,30 @@ resource "aws_api_gateway_method" "proxy" {
   
   request_parameters = {
     "method.request.path.proxy" = true
+  }
+}
+
+# Method response for proxy (to enable CORS headers)
+resource "aws_api_gateway_method_response" "proxy" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.proxy.id
+  http_method = aws_api_gateway_method.proxy.http_method
+  status_code = "200"
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = true
+  }
+}
+
+# Integration response for proxy (to set CORS headers)
+resource "aws_api_gateway_integration_response" "proxy" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.proxy.id
+  http_method = aws_api_gateway_method.proxy.http_method
+  status_code = aws_api_gateway_method_response.proxy.status_code
+  
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Origin" = "'https://dczs8zbwc9iyf.cloudfront.net'"
   }
 }
 
@@ -66,6 +93,9 @@ resource "aws_api_gateway_integration" "root" {
   integration_http_method = "ANY"
   type                   = "HTTP_PROXY"
   uri                    = "http://${var.alb_dns_name}/"
+  
+  # Increase timeout for slow operations
+  timeout_milliseconds = 29000
 }
 
 # CORS OPTIONS method for proxy
@@ -122,6 +152,7 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_integration.proxy,
     aws_api_gateway_integration.root,
     aws_api_gateway_integration.proxy_options,
+    aws_api_gateway_integration_response.proxy,
   ]
   
   rest_api_id = aws_api_gateway_rest_api.main.id
@@ -132,6 +163,7 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_integration.proxy,
       aws_api_gateway_integration.root,
       aws_api_gateway_integration.proxy_options,
+      aws_api_gateway_integration_response.proxy,
     ]))
   }
   

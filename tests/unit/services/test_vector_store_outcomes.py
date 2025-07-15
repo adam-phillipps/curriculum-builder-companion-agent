@@ -230,3 +230,126 @@ class TestOutcomesCollection:
                 name="learning_outcomes",
                 metadata={"description": "Learning content collection: learning_outcomes"}
             )
+
+
+class TestChromaDBConnectivityFixes:
+    """Test fixes for ChromaDB connectivity issues discovered in production."""
+    
+    @patch('src.services.vector_store.settings')
+    @patch('src.services.vector_store.chromadb.PersistentClient')
+    def test_persistent_client_fallback_for_localhost(self, mock_persistent, mock_settings):
+        """Test that PersistentClient is used for localhost connections."""
+        # Setup
+        mock_settings.CHROMA_HOST = "localhost"
+        mock_settings.CHROMA_PORT = 8000
+        
+        mock_client = MagicMock()
+        mock_client.get_version.return_value = "0.4.18"
+        mock_persistent.return_value = mock_client
+        
+        # Execute
+        service = VectorStoreService()
+        client = service.client
+        
+        # Assert
+        mock_persistent.assert_called_once_with(path="/tmp/chroma_data")
+        assert client == mock_client
+    
+    @patch('src.services.vector_store.settings')
+    @patch('src.services.vector_store.chromadb.PersistentClient')
+    def test_persistent_client_fallback_for_chromadb_hostname(self, mock_persistent, mock_settings):
+        """Test that PersistentClient is used for 'chromadb' hostname (Docker)."""
+        # Setup
+        mock_settings.CHROMA_HOST = "chromadb"
+        mock_settings.CHROMA_PORT = 8000
+        
+        mock_client = MagicMock()
+        mock_client.get_version.return_value = "0.4.18"
+        mock_persistent.return_value = mock_client
+        
+        # Execute
+        service = VectorStoreService()
+        client = service.client
+        
+        # Assert
+        mock_persistent.assert_called_once_with(path="/tmp/chroma_data")
+        assert client == mock_client
+    
+    @patch('src.services.vector_store.settings')
+    @patch('src.services.vector_store.chromadb.HttpClient')
+    def test_http_client_for_remote_connections(self, mock_http, mock_settings):
+        """Test that HttpClient is used for remote ChromaDB connections."""
+        # Setup
+        mock_settings.CHROMA_HOST = "production-chromadb.aws.com"
+        mock_settings.CHROMA_PORT = 8000
+        
+        mock_client = MagicMock()
+        mock_client.get_version.return_value = "1.0.0"
+        mock_http.return_value = mock_client
+        
+        # Execute
+        service = VectorStoreService()
+        client = service.client
+        
+        # Assert
+        mock_http.assert_called_once_with(
+            host="production-chromadb.aws.com",
+            port=8000
+        )
+        assert client == mock_client
+    
+    @patch('src.services.vector_store.settings')
+    @patch('src.services.vector_store.chromadb.HttpClient')
+    def test_connection_error_handling_with_proper_exception(self, mock_http, mock_settings):
+        """Test that connection errors are properly handled and re-raised."""
+        # Setup
+        mock_settings.CHROMA_HOST = "unreachable-host.com"
+        mock_settings.CHROMA_PORT = 8000
+        
+        mock_client = MagicMock()
+        mock_client.get_version.side_effect = ConnectionError("Connection failed")
+        mock_http.return_value = mock_client
+        
+        service = VectorStoreService()
+        
+        # Should raise the connection error when testing connection
+        with pytest.raises(ConnectionError, match="Connection failed"):
+            _ = service.client
+    
+    def test_version_compatibility_handling(self):
+        """Test handling of ChromaDB version compatibility issues."""
+        with patch('src.config.get_settings') as mock_settings:
+            mock_settings.return_value.CHROMA_HOST = "localhost"
+            mock_settings.return_value.CHROMA_PORT = 8000
+            
+            with patch('src.services.vector_store.chromadb.PersistentClient') as mock_persistent:
+                # Simulate version mismatch error
+                mock_persistent.side_effect = ValueError("Could not connect to tenant default_tenant")
+                
+                service = VectorStoreService()
+                
+                # Should raise the version compatibility error
+                with pytest.raises(ValueError, match="Could not connect to tenant"):
+                    _ = service.client
+    
+    def test_add_learning_outcome_handles_connection_errors(self, sample_outcome_data):
+        """Test that add_learning_outcome handles ChromaDB connection errors gracefully."""
+        with patch('src.services.vector_store.chromadb.PersistentClient') as mock_persistent:
+            mock_persistent.side_effect = ConnectionError("ChromaDB unreachable")
+            
+            service = VectorStoreService()
+            
+            # Should raise connection error when trying to access client
+            with pytest.raises(ConnectionError):
+                service.add_learning_outcome(**sample_outcome_data)
+    
+    def test_find_similar_outcomes_handles_connection_errors(self):
+        """Test that find_similar_outcomes handles ChromaDB connection errors gracefully."""
+        with patch('src.services.vector_store.chromadb.PersistentClient') as mock_persistent:
+            mock_persistent.side_effect = ConnectionError("ChromaDB unreachable")
+            
+            service = VectorStoreService()
+            
+            # Should return empty list when ChromaDB is unreachable
+            results = service.find_similar_outcomes("test query")
+            assert results == []

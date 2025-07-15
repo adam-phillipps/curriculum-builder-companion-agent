@@ -36,7 +36,11 @@ export const API_CONFIG = {
 export const buildApiUrl = (endpoint: string): string => {
   // Remove leading slash if present to avoid double slashes
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
-  return `${API_CONFIG.FULL_BASE_URL}/${cleanEndpoint}`;
+  // Ensure no trailing slash in the base URL
+  const baseUrl = API_CONFIG.FULL_BASE_URL.endsWith('/') 
+    ? API_CONFIG.FULL_BASE_URL.slice(0, -1) 
+    : API_CONFIG.FULL_BASE_URL;
+  return `${baseUrl}/${cleanEndpoint}`;
 };
 
 // Helper function for building docs URLs

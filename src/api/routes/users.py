@@ -44,7 +44,7 @@ async def create_new_user(
             detail=f"Failed to create user: {str(e)}"
         )
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse])
 async def list_users(
     q: Optional[str] = None,
     role: Optional[str] = None,

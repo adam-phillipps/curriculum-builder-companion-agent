@@ -284,3 +284,87 @@ class TestDatabaseIntegration:
             # Should always have at least the custom option
             assert len(data) >= 1
             assert data[-1]["is_existing"] is False  # Custom option at end
+
+
+class TestPostgreSQLJSONTagsBugFixes:
+    """Test fixes for PostgreSQL JSON tags column issues."""
+    
+    async def test_search_handles_json_tags_column_gracefully(self, client):
+        """Test that search handles PostgreSQL JSON tags column without array_to_string errors."""
+        from sqlalchemy.exc import ProgrammingError
+        from sqlalchemy.dialects.postgresql.asyncpg import ProgrammingError as AsyncPGError
+        
+        # Mock database error that occurred in production
+        with patch('src.api.dependencies.get_db') as mock_get_db:
+            mock_db = AsyncMock()
+            mock_get_db.return_value = mock_db
+            
+            # Simulate the exact PostgreSQL error from production logs
+            pg_error = AsyncPGError(
+                "function array_to_string(json, character varying) does not exist",
+                None, None
+            )
+            mock_db.execute.side_effect = ProgrammingError("", "", pg_error)
+            
+            # Mock vector search fallback
+            with patch('src.api.routes.learning_outcomes.search_similar_outcomes') as mock_vector:
+                mock_vector.return_value = []
+                
+                # Execute - should not crash
+                response = await client.get("/api/v1/learning-outcomes/search?query=Law")
+                
+                # Assert - should return custom suggestion despite database error
+                assert response.status_code == 200
+                data = response.json()
+                assert len(data) == 1
+                assert data[0]["name"] == "Law"
+                assert data[0]["is_existing"] is False
+    
+    async def test_search_uses_json_astext_for_tags_search(self, client):
+        """Test that search uses JSON .astext instead of array_to_string for tags."""
+        # This test verifies the fix is in place by checking the query structure
+        with patch('src.api.dependencies.get_db') as mock_get_db:
+            mock_db = AsyncMock()
+            mock_get_db.return_value = mock_db
+            
+            # Mock successful query execution
+            mock_result = AsyncMock()
+            mock_result.scalars.return_value.all.return_value = []
+            mock_db.execute.return_value = mock_result
+            
+            # Execute search
+            response = await client.get("/api/v1/learning-outcomes/search?query=python")
+            
+            # Assert - should execute without PostgreSQL function errors
+            assert response.status_code == 200
+            mock_db.execute.assert_called_once()
+            
+            # Verify the query doesn't use array_to_string
+            call_args = mock_db.execute.call_args[0][0]
+            query_str = str(call_args)
+            assert "array_to_string" not in query_str.lower()
+    
+    async def test_search_handles_cache_permission_errors(self, client):
+        """Test that search handles ML library cache permission errors gracefully."""
+        with patch('src.api.dependencies.get_db') as mock_get_db:
+            mock_db = AsyncMock()
+            mock_get_db.return_value = mock_db
+            
+            # Mock successful database query
+            mock_result = AsyncMock()
+            mock_result.scalars.return_value.all.return_value = []
+            mock_db.execute.return_value = mock_result
+            
+            # Mock vector search with cache permission error
+            with patch('src.api.routes.learning_outcomes.search_similar_outcomes') as mock_vector:
+                mock_vector.side_effect = PermissionError("[Errno 13] Permission denied: '/home/appuser/.cache'")
+                
+                # Execute - should not crash
+                response = await client.get("/api/v1/learning-outcomes/search?query=test")
+                
+                # Assert - should return custom suggestion despite cache error
+                assert response.status_code == 200
+                data = response.json()
+                assert len(data) == 1
+                assert data[0]["name"] == "test"
+                assert data[0]["is_existing"] is False

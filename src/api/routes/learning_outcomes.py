@@ -80,7 +80,7 @@ async def search_outcome_suggestions(
         search_conditions = [
             LearningOutcome.name.ilike(f"%{query}%"),
             LearningOutcome.description.ilike(f"%{query}%"),
-            func.array_to_string(LearningOutcome.tags, ',').ilike(f"%{query}%")
+            LearningOutcome.tags.astext.ilike(f"%{query}%")
         ]
         
         if domain:
@@ -187,7 +187,7 @@ async def search_outcome_suggestions(
     suggestions.sort(key=lambda x: x.similarity_score, reverse=True)
     return suggestions[:max_results]
 
-@router.post("/", response_model=LearningOutcomeResponse)
+@router.post("", response_model=LearningOutcomeResponse, status_code=201)
 async def create_outcome(
     outcome: LearningOutcomeCreate,
     db: AsyncSession = Depends(get_db)
@@ -217,7 +217,7 @@ async def create_outcome(
         created_by_user_id=db_outcome.created_by_user_id
     )
 
-@router.get("/", response_model=List[LearningOutcomeResponse])
+@router.get("", response_model=List[LearningOutcomeResponse])
 async def list_outcomes(
     status: Optional[str] = Query(None, description="Filter by status"),
     domain: Optional[str] = Query(None, description="Filter by domain"),

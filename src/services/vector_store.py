@@ -28,24 +28,23 @@ class VectorStoreService:
         """Lazy initialization of ChromaDB client."""
         if self._client is None:
             try:
-                # Try PersistentClient first, fallback to HttpClient
-                try:
-                    # For development, use PersistentClient with shared volume
+                # Try PersistentClient first for local development
+                if settings.CHROMA_HOST in ['localhost', '127.0.0.1', 'chromadb']:
                     self._client = chromadb.PersistentClient(
                         path="/tmp/chroma_data"
                     )
-                except Exception as e:
-                    print(f"PersistentClient failed: {e}, trying HttpClient...")
-                    # Fallback to HttpClient
+                else:
+                    # Use HttpClient for remote connections
                     self._client = chromadb.HttpClient(
                         host=settings.CHROMA_HOST,
                         port=settings.CHROMA_PORT
                     )
-                # Connection will be tested when first used
+                # Test connection
+                self._client.get_version()
             except Exception as e:
                 print(f"ChromaDB connection failed: {e}")
-                # For development, we can continue without vector store
-                self._client = None
+                import traceback
+                traceback.print_exc()
                 raise
         return self._client
     

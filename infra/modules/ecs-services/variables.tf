@@ -118,6 +118,12 @@ variable "chromadb_memory" {
   default     = 512
 }
 
+variable "chromadb_port" {
+  description = "ChromaDB service port"
+  type        = number
+  default     = 8000
+}
+
 variable "frontend_bucket_name" {
   description = "Frontend S3 bucket name for documentation deployment"
   type        = string

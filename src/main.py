@@ -21,6 +21,7 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
+    redirect_slashes=False,  # Disable automatic redirects for trailing slashes
     openapi_tags=[
         {"name": "system", "description": "System health and information"},
         {"name": "content", "description": "Learning content management"},
@@ -74,7 +75,7 @@ else:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*\.cloudfront\.net|https://.*\.amazonaws\.com|http://localhost:3000|http://frontend:3000" if not cors_origins else None,
+    allow_origin_regex=r"https://.*\.cloudfront\.net|https://.*\.amazonaws\.com|http://localhost:3000|https://localhost:3000|http://frontend:3000" if not cors_origins else None,
     allow_credentials=cors_credentials,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

@@ -37,7 +37,7 @@ resource "aws_ecs_task_definition" "api" {
         },
         {
           name  = "CHROMA_PORT"
-          value = "8000"
+          value = tostring(var.chromadb_port)
         }
       ]
       
@@ -129,7 +129,15 @@ resource "aws_ecs_task_definition" "api" {
         },
         {
           name  = "CHROMA_PORT"
-          value = "8000"
+          value = tostring(var.chromadb_port)
+        },
+        {
+          name  = "TRANSFORMERS_CACHE"
+          value = "/tmp/transformers_cache"
+        },
+        {
+          name  = "HF_HOME"
+          value = "/tmp/huggingface_cache"
         }
       ]
       
@@ -215,7 +223,7 @@ resource "aws_ecs_task_definition" "chromadb" {
       
       portMappings = [
         {
-          containerPort = 8000
+          containerPort = var.chromadb_port
           protocol      = "tcp"
         }
       ]
@@ -227,7 +235,7 @@ resource "aws_ecs_task_definition" "chromadb" {
         },
         {
           name  = "CHROMA_SERVER_HTTP_PORT"
-          value = "8000"
+          value = tostring(var.chromadb_port)
         }
       ]
       
@@ -241,7 +249,7 @@ resource "aws_ecs_task_definition" "chromadb" {
       }
       
       healthCheck = {
-        command     = ["CMD", "chroma", "db", "list"]
+        command     = ["CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/${var.chromadb_port}"]
         interval    = 30
         timeout     = 10
         retries     = 3
@@ -291,7 +299,7 @@ resource "aws_ecs_task_definition" "db_migrate" {
         },
         {
           name  = "CHROMA_PORT"
-          value = "8000"
+          value = tostring(var.chromadb_port)
         }
       ]
       
@@ -436,8 +444,6 @@ resource "aws_service_discovery_service" "chromadb" {
     
     routing_policy = "MULTIVALUE"
   }
-  
-  health_check_grace_period_seconds = 30
   
   tags = var.tags
 }

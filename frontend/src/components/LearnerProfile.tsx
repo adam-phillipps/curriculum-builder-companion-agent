@@ -86,7 +86,7 @@ function LearningGoalSection({ userId, profile, onGoalSet }: { userId: number, p
       
       // If it's a custom goal, create it first
       if (!selectedGoal.is_existing) {
-        const goalResponse = await fetch(buildApiUrl('learning-outcomes/'), {
+        const goalResponse = await fetch(buildApiUrl('learning-outcomes'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

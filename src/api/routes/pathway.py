@@ -4,7 +4,7 @@ Pathway API routes for learning pathway data and chain rule analysis.
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from src.api.dependencies import get_db
 from src.utils.chain_rule import calculate_learning_impact
@@ -214,13 +214,14 @@ async def get_user_skill_profile(
 ) -> Dict[str, Any]:
     """Get user skill assessment profile for pathway recommendations."""
     
-    skills_query = await db.execute(text("""
-        SELECT skill_category, proficiency_level, assessment_date
-        FROM user_skill_assessments 
-        WHERE user_id = :user_id
-        ORDER BY assessment_date DESC
-    """), {"user_id": user_id})
-    skills = skills_query.fetchall()
+    from src.db.models.user import UserSkillAssessment
+    
+    skills_result = await db.execute(
+        select(UserSkillAssessment.skill_category, UserSkillAssessment.proficiency_level, UserSkillAssessment.assessment_date)
+        .where(UserSkillAssessment.user_id == user_id)
+        .order_by(UserSkillAssessment.assessment_date.desc())
+    )
+    skills = skills_result.fetchall()
     
     skill_profile = {}
     for skill in skills:
@@ -243,27 +244,31 @@ async def get_pathway_chain_analysis(
     """Get chain rule analysis for a learning pathway."""
     
     # Get pathway data from database
-    pathway_query = await db.execute(text("""
-        SELECT p.id, p.name, p.completion_percentage, p.target_persona
-        FROM learning_pathways p 
-        WHERE p.id = :pathway_id
-    """), {"pathway_id": pathway_id})
-    pathway = pathway_query.fetchone()
+    from src.db.models.content import LearningPathway
+    
+    pathway_result = await db.execute(
+        select(LearningPathway.id, LearningPathway.name, LearningPathway.completion_percentage, LearningPathway.target_persona)
+        .where(LearningPathway.id == pathway_id)
+    )
+    pathway = pathway_result.fetchone()
     
     if not pathway:
         raise HTTPException(status_code=404, detail="Pathway not found")
     
     # Get pathway items with chain rule data
-    items_query = await db.execute(text("""
-        SELECT pi.content_id, pi.sequence, pi.weight, pi.prerequisite_ids,
-               pi.completion_status, pi.completion_percentage, pi.success_score,
-               lc.title, lc.description
-        FROM pathway_items pi
-        JOIN learning_content lc ON pi.content_id = lc.id
-        WHERE pi.pathway_id = :pathway_id
-        ORDER BY pi.sequence
-    """), {"pathway_id": pathway_id})
-    items = items_query.fetchall()
+    from src.db.models.content import PathwayItem, LearningContent
+    
+    items_result = await db.execute(
+        select(
+            PathwayItem.content_id, PathwayItem.sequence, PathwayItem.weight, PathwayItem.prerequisite_ids,
+            PathwayItem.completion_status, PathwayItem.completion_percentage, PathwayItem.success_score,
+            LearningContent.title, LearningContent.description
+        )
+        .join(LearningContent, PathwayItem.content_id == LearningContent.id)
+        .where(PathwayItem.pathway_id == pathway_id)
+        .order_by(PathwayItem.sequence)
+    )
+    items = items_result.fetchall()
     
     # Format data for chain rule calculation
     pathway_data = {
