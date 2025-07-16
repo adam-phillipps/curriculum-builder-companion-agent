@@ -151,11 +151,20 @@ resource "aws_security_group" "ecs" {
   name_prefix = "${var.environment}-ecs-"
   vpc_id      = aws_vpc.main.id
   
+  # Allow ALB to reach API containers
   ingress {
     from_port       = 8000
     to_port         = 8001
     protocol        = "tcp"
     security_groups = [aws_security_group.alb.id]
+  }
+  
+  # Allow ECS containers to communicate with each other (for ChromaDB)
+  ingress {
+    from_port = 8000
+    to_port   = 8000
+    protocol  = "tcp"
+    self      = true
   }
   
   egress {

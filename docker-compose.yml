@@ -129,6 +129,7 @@ services:
       - RELOAD=${RELOAD:-true}
       - DOCS_HOST=${DOCS_HOST:-localhost}
       - DOCS_PORT=${DOCS_PORT:-8080}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}  # Configure logging level
     depends_on:
       postgres:
         condition: service_healthy

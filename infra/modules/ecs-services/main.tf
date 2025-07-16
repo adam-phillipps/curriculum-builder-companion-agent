@@ -138,6 +138,10 @@ resource "aws_ecs_task_definition" "api" {
         {
           name  = "HF_HOME"
           value = "/tmp/huggingface_cache"
+        },
+        {
+          name  = "LOG_LEVEL"
+          value = "INFO"
         }
       ]
       
@@ -215,6 +219,17 @@ resource "aws_ecs_task_definition" "chromadb" {
   memory                   = var.chromadb_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn           = var.task_role_arn
+  
+  # EFS volume for data persistence
+  dynamic "volume" {
+    for_each = var.efs_file_system_id != "" ? [1] : []
+    content {
+      name = "chromadb-data"
+      efs_volume_configuration {
+        file_system_id = var.efs_file_system_id
+      }
+    }
+  }
 
   container_definitions = jsonencode([
     {
@@ -239,6 +254,15 @@ resource "aws_ecs_task_definition" "chromadb" {
         }
       ]
       
+      # Mount EFS volume if available
+      mountPoints = var.efs_file_system_id != "" ? [
+        {
+          sourceVolume  = "chromadb-data"
+          containerPath = "/chroma/chroma"
+          readOnly      = false
+        }
+      ] : []
+      
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -248,13 +272,8 @@ resource "aws_ecs_task_definition" "chromadb" {
         }
       }
       
-      healthCheck = {
-        command     = ["CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/${var.chromadb_port}"]
-        interval    = 30
-        timeout     = 10
-        retries     = 3
-        startPeriod = 40
-      }
+      # No health check - ECS will monitor container status
+      # ChromaDB container is healthy if it starts and doesn't crash
     }
   ])
 
@@ -418,7 +437,8 @@ resource "aws_ecs_service" "api" {
     container_port   = 8000
   }
 
-  # depends_on = [var.alb_listener_arn]
+  # Ensure ChromaDB service is running before API starts
+  depends_on = [aws_ecs_service.chromadb]
   tags       = var.tags
 }
 

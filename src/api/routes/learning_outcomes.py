@@ -1,14 +1,18 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from src.api.dependencies import get_db
 from src.db.crud.learning_outcomes import (
     create_learning_outcome, get_learning_outcomes, 
-    update_learning_outcome_status, search_similar_outcomes
+    update_learning_outcome_status, search_similar_outcomes,
+    search_learning_outcomes_by_text
 )
+from src.utils.logger import get_logger, set_request_id, log_execution_time
+
+# Create module logger
+logger = get_logger("api.learning_outcomes")
 
 router = APIRouter(prefix="/learning-outcomes", tags=["learning-outcomes"])
 
@@ -41,7 +45,9 @@ class OutcomeSuggestion(BaseModel):
     is_existing: bool
 
 @router.get("/search", response_model=List[OutcomeSuggestion])
+@log_execution_time
 async def search_outcome_suggestions(
+    request: Request,
     query: str = Query(..., description="User's learning goal text"),
     max_results: int = Query(10, ge=1, le=20),
     domain: Optional[str] = Query(None, description="Filter by domain"),
@@ -63,33 +69,35 @@ async def search_outcome_suggestions(
     Returns:
         List of outcome suggestions with similarity scores and metadata
     """
+    # Set request ID for tracing
+    request_id = set_request_id(request.headers.get("X-Request-ID"))
+    
+    logger.info(
+        f"Searching for learning outcomes with query: '{query}'", 
+        extra={
+            "query": query, 
+            "max_results": max_results,
+            "domain": domain,
+            "request_id": request_id
+        }
+    )
+    
     suggestions = []
     
     try:
         # Strategy: Fast database text search first, then vector search fallback
         # This provides sub-second response times while maintaining quality
-        from sqlalchemy import or_, func
-        from src.db.models.learning_outcomes import LearningOutcome
-        
-        db_query = select(LearningOutcome).where(
-            LearningOutcome.status == "approved"
+        db_outcomes = await search_learning_outcomes_by_text(
+            db=db,
+            query=query,
+            domain=domain,
+            max_results=max_results
         )
         
-        # Text-based similarity using ILIKE for fast matching
-        # Searches across name, description, and tags for comprehensive coverage
-        search_conditions = [
-            LearningOutcome.name.ilike(f"%{query}%"),
-            LearningOutcome.description.ilike(f"%{query}%"),
-            LearningOutcome.tags.astext.ilike(f"%{query}%")
-        ]
-        
-        if domain:
-            search_conditions.append(LearningOutcome.domain == domain)
-        
-        db_query = db_query.where(or_(*search_conditions)).limit(max_results)
-        
-        result = await db.execute(db_query)
-        db_outcomes = result.scalars().all()
+        logger.debug(
+            f"Database search found {len(db_outcomes)} outcomes",
+            extra={"db_outcome_count": len(db_outcomes), "request_id": request_id}
+        )
         
         # Convert database results to suggestions with calculated similarity scores
         for outcome in db_outcomes:
@@ -118,11 +126,20 @@ async def search_outcome_suggestions(
         # Fallback to vector similarity search if database results are insufficient
         # Vector search provides semantic matching but is slower
         if len(suggestions) < 3:
+            logger.debug(
+                "Insufficient database results, falling back to vector search",
+                extra={"suggestion_count": len(suggestions), "request_id": request_id}
+            )
             try:
                 similar_outcomes = await search_similar_outcomes(
                     query_text=query,
                     max_results=5,  # Limited for performance
                     domain_filter=domain
+                )
+                
+                logger.debug(
+                    f"Vector search found {len(similar_outcomes)} outcomes",
+                    extra={"vector_outcome_count": len(similar_outcomes), "request_id": request_id}
                 )
                 
                 # Add vector search results, avoiding duplicates
@@ -141,11 +158,19 @@ async def search_outcome_suggestions(
                             is_existing=True
                         ))
             except Exception as e:
-                print(f"Vector search fallback failed: {e}")
+                logger.error(
+                    f"Vector search fallback failed: {str(e)}",
+                    extra={"error": str(e), "request_id": request_id},
+                    exc_info=True
+                )
                 # Continue without vector results
     
     except Exception as e:
-        print(f"Database search error: {e}")
+        logger.error(
+            f"Database search error: {str(e)}",
+            extra={"error": str(e), "request_id": request_id},
+            exc_info=True
+        )
         # Try vector search as complete fallback
         try:
             similar_outcomes = await search_similar_outcomes(
@@ -166,7 +191,11 @@ async def search_outcome_suggestions(
                     is_existing=True
                 ))
         except Exception as ve:
-            print(f"Vector search also failed: {ve}")
+            logger.error(
+                f"Vector search also failed: {str(ve)}",
+                extra={"error": str(ve), "request_id": request_id},
+                exc_info=True
+            )
             # Continue to custom suggestion
     
     # Always provide option to create custom learning outcome
@@ -185,26 +214,73 @@ async def search_outcome_suggestions(
     # Sort by similarity score (highest first) and limit results
     # Custom option will appear last due to 0.0 similarity score
     suggestions.sort(key=lambda x: x.similarity_score, reverse=True)
-    return suggestions[:max_results]
+    final_suggestions = suggestions[:max_results]
+    
+    logger.info(
+        f"Returning {len(final_suggestions)} learning outcome suggestions",
+        extra={
+            "suggestion_count": len(final_suggestions),
+            "has_custom_option": any(not s.is_existing for s in final_suggestions),
+            "request_id": request_id
+        }
+    )
+    
+    return final_suggestions
 
 @router.post("", response_model=LearningOutcomeResponse, status_code=201)
+@log_execution_time
 async def create_outcome(
+    request: Request,
     outcome: LearningOutcomeCreate,
     db: AsyncSession = Depends(get_db)
 ):
     """Create new learning outcome (requires admin approval if created by user)."""
+    # Set request ID for tracing
+    request_id = set_request_id(request.headers.get("X-Request-ID"))
+    
+    logger.info(
+        f"Creating new learning outcome: '{outcome.name}'",
+        extra={
+            "outcome_name": outcome.name,
+            "domain": outcome.domain,
+            "difficulty_level": outcome.difficulty_level,
+            "created_by_user_id": outcome.created_by_user_id,
+            "request_id": request_id
+        }
+    )
+    
     status = "approved" if not outcome.created_by_user_id else "pending_approval"
     
-    db_outcome = await create_learning_outcome(
-        db=db,
-        name=outcome.name,
-        description=outcome.description,
-        domain=outcome.domain,
-        difficulty_level=outcome.difficulty_level,
-        tags=outcome.tags,
-        created_by_user_id=outcome.created_by_user_id,
-        status=status
-    )
+    try:
+        db_outcome = await create_learning_outcome(
+            db=db,
+            name=outcome.name,
+            description=outcome.description,
+            domain=outcome.domain,
+            difficulty_level=outcome.difficulty_level,
+            tags=outcome.tags,
+            created_by_user_id=outcome.created_by_user_id,
+            status=status
+        )
+        
+        logger.info(
+            f"Successfully created learning outcome with ID {db_outcome.id}",
+            extra={
+                "outcome_id": db_outcome.id,
+                "status": db_outcome.status,
+                "request_id": request_id
+            }
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to create learning outcome: {str(e)}",
+            extra={"error": str(e), "request_id": request_id},
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create learning outcome: {str(e)}"
+        )
     
     return LearningOutcomeResponse(
         id=db_outcome.id,

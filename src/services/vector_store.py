@@ -7,6 +7,8 @@ from chromadb.config import Settings
 from typing import List, Dict, Any, Optional, Tuple
 import hashlib
 import json
+import requests
+import traceback
 from datetime import datetime
 from src.config import get_settings
 from src.vector_store.metadata_mapper import metadata_mapper
@@ -27,25 +29,11 @@ class VectorStoreService:
     def client(self):
         """Lazy initialization of ChromaDB client."""
         if self._client is None:
-            try:
-                # Try PersistentClient first for local development
-                if settings.CHROMA_HOST in ['localhost', '127.0.0.1', 'chromadb']:
-                    self._client = chromadb.PersistentClient(
-                        path="/tmp/chroma_data"
-                    )
-                else:
-                    # Use HttpClient for remote connections
-                    self._client = chromadb.HttpClient(
-                        host=settings.CHROMA_HOST,
-                        port=settings.CHROMA_PORT
-                    )
-                # Test connection
-                self._client.get_version()
-            except Exception as e:
-                print(f"ChromaDB connection failed: {e}")
-                import traceback
-                traceback.print_exc()
-                raise
+            self._client = chromadb.HttpClient(
+                host=settings.CHROMA_HOST,
+                port=settings.CHROMA_PORT,
+                settings=Settings(chroma_client_timeout_seconds=10)
+            )
         return self._client
     
     @property
@@ -203,7 +191,6 @@ class VectorStoreService:
                                 all_similar_items.append(content_metadata)
                 except Exception as e:
                     print(f"Error querying collection: {e}")
-                    import traceback
                     traceback.print_exc()
                     continue
             

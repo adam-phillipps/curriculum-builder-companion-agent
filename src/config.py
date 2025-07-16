@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_KEY_HEADER: str = "X-API-Key"
     SECRET_KEY: SecretStr
+    LOG_LEVEL: str = "INFO"  # Default log level
 
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str

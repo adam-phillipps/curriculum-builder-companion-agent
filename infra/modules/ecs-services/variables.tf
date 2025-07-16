@@ -158,3 +158,9 @@ variable "vpc_id" {
   description = "VPC ID for service discovery"
   type        = string
 }
+
+variable "efs_file_system_id" {
+  description = "EFS file system ID for ChromaDB persistence"
+  type        = string
+  default     = ""
+}

@@ -138,9 +138,10 @@ module "ecs_services" {
   database_host          = module.rds.host
   redis_endpoint          = module.elasticache.endpoint
   secrets_arn            = module.secrets.secrets_arn
-  api_log_group          = "/ecs/sandbox-curriculum-api"
+  api_log_group          = module.monitoring.api_log_group_name
   chromadb_log_group     = "/ecs/sandbox-curriculum-chromadb"
   frontend_bucket_name   = module.s3.frontend_bucket_name
+  efs_file_system_id     = module.efs.file_system_id
   api_image              = "${module.ecr.curriculum_api_repository_url}"
   api_image_tag          = "latest"
   migrate_image          = "${module.ecr.curriculum_migrate_repository_url}"
@@ -160,5 +161,25 @@ module "s3" {
   
   environment = "sandbox"
   tags        = local.environment_tags
+}
+
+# Monitoring and Logging
+module "monitoring" {
+  source = "../../modules/monitoring"
+  
+  environment = "sandbox"
+  aws_region  = var.aws_region
+  tags        = local.environment_tags
+}
+
+# EFS for ChromaDB persistence
+module "efs" {
+  source = "../../modules/efs"
+  
+  environment           = "sandbox"
+  vpc_id                = module.networking.vpc_id
+  private_subnet_ids    = module.networking.private_subnet_ids
+  ecs_security_group_id = module.networking.ecs_security_group_id
+  tags                  = local.environment_tags
 }
 

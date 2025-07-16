@@ -6,13 +6,20 @@ import os
 from src.config import settings
 from src.db.init import initialize_database
 from src.api.routes import content, agents, vector_store, analysis, users, pathway, progress, learning_outcomes
+from src.api.middleware import setup_middleware
+from src.utils.logger import get_logger
+
+# Create application logger
+logger = get_logger("app")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    logger.info(f"Starting application in {settings.APP_ENV} environment")
     # await initialize_database()  # Temporarily disabled
     yield
     # Shutdown (if needed)
+    logger.info("Shutting down application")
 
 app = FastAPI(
     title="Curriculum Builder Companion Agent",
@@ -82,6 +89,10 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# Setup middleware
+setup_middleware(app)
+
+# Include routers
 app.include_router(content.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 app.include_router(vector_store.router, prefix="/api/v1")
@@ -90,6 +101,8 @@ app.include_router(users.router, prefix="/api/v1")
 app.include_router(pathway.router, prefix="/api/v1")
 app.include_router(progress.router, prefix="/api/v1")
 app.include_router(learning_outcomes.router, prefix="/api/v1")
+
+logger.info("All routes registered successfully")
 
 # Mount documentation as static files
 if os.path.exists("/app/docs/site"):
@@ -113,6 +126,7 @@ async def health_check():
     Returns:
         dict: Health status and service information
     """
+    logger.debug("Health check requested")
     return {"status": "healthy", "service": "curriculum-builder", "version": "1.0.0"}
 
 @app.get("/", tags=["system"])
